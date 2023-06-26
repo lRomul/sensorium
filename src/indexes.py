@@ -1,4 +1,3 @@
-
 class StackIndexesGenerator:
     def __init__(self, size: int, step: int):
         self.size = size

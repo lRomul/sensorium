@@ -64,7 +64,6 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         video_index, frame_indexes = self.get_frame_indexes(index)
-        print(video_index, frame_indexes)
         frames, responses = self.get_frames_responses(video_index, frame_indexes)
         return self.process_frames_responses(frames, responses)
 

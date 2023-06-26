@@ -58,7 +58,7 @@ class NormalizePadFramesProcessor(FramesProcessor):
 
 
 _FRAME_PROCESSOR_REGISTRY: dict[str, Type[FramesProcessor]] = dict(
-    pad_normalize=NormalizePadFramesProcessor,
+    normalize_pad=NormalizePadFramesProcessor,
 )
 
 
