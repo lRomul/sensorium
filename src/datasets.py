@@ -47,7 +47,9 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
         responses = self.get_responses(video_index, frame_indexes)
         return frames, responses
 
-    def process_frames_responses(self, frames: np.ndarray, responses: np.ndarray):
+    def process_frames_responses(self,
+                                 frames: np.ndarray,
+                                 responses: np.ndarray) -> tuple[torch.Tensor, torch.Tensor]:
         input_tensor = self.frames_processor(frames)
         target_tensor = self.responses_processor(responses)
         return input_tensor, target_tensor
@@ -64,8 +66,7 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
         video_index, frame_indexes = self.get_frame_indexes(index)
         print(video_index, frame_indexes)
         frames, responses = self.get_frames_responses(video_index, frame_indexes)
-        frames, responses = self.process_frames_responses(frames, responses)
-        return frames, responses
+        return self.process_frames_responses(frames, responses)
 
 
 class TrainMouseVideoDataset(MouseVideoDataset):

@@ -17,7 +17,7 @@ class StackIndexesGenerator:
                 self.step,
             )
         )
-inde
+
     def clip_index(self, index: int, frame_count: int, save_zone: int = 0) -> int:
         behind_frames = self.behind + save_zone
         ahead_frames = self.ahead + save_zone

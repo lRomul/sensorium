@@ -49,12 +49,12 @@ class NormalizePadFramesProcessor(FramesProcessor):
         self.fill_value = fill_value
 
     def __call__(self, frames: np.ndarray) -> torch.Tensor:
-        frames = torch.from_numpy(frames)
-        frames = normalize_frames(frames)
-        frames = pad_to_frames(frames, self.size,
-                               pad_mode=self.pad_mode,
-                               fill_value=self.fill_value)
-        return frames
+        tensor_frames = torch.from_numpy(frames)
+        tensor_frames = normalize_frames(tensor_frames)
+        tensor_frames = pad_to_frames(tensor_frames, self.size,
+                                      pad_mode=self.pad_mode,
+                                      fill_value=self.fill_value)
+        return tensor_frames
 
 
 _FRAME_PROCESSOR_REGISTRY: dict[str, Type[FramesProcessor]] = dict(

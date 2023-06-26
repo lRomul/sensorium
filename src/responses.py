@@ -14,8 +14,7 @@ class ResponsesProcessor(metaclass=abc.ABCMeta):
 
 class DefaultResponsesProcessor(ResponsesProcessor):
     def __call__(self, frames: np.ndarray) -> torch.Tensor:
-        frames = torch.from_numpy(frames)
-        return frames
+        return torch.from_numpy(frames)
 
 
 _RESPONSES_PROCESSOR_REGISTRY: dict[str, Type[ResponsesProcessor]] = dict(
