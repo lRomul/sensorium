@@ -5,8 +5,8 @@ data_dir = work_dir / "data"
 deeplake_dir = data_dir / "deeplake"
 
 configs_dir = work_dir / "configs"
-experiments_dir = work_dir / "experiments"
-predictions_dir = work_dir / "predictions"
+experiments_dir = data_dir / "experiments"
+predictions_dir = data_dir / "predictions"
 
 deeplake_path_format = "hub://sinzlab/Sensorium_2023_{mouse}_{split}"
 
