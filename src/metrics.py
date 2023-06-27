@@ -39,8 +39,9 @@ class CorrelationMetric(Metric):
     def update(self, step_output: dict):
         prediction = step_output["prediction"]
         target = step_output["target"]
-        correlation = corr(prediction, target, dim=-1)
-        self.avg_meter.update(correlation.item())
+        correlations = corr(prediction, target, dim=-1)
+        for value in correlations.ravel():
+            self.avg_meter.update(value.item())
 
     def compute(self):
         if self.avg_meter.count == 0:

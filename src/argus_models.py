@@ -4,8 +4,8 @@ import timm
 import argus
 from argus.loss import pytorch_losses
 
-from src.responses import Exp
-from src.losses import LogMSELoss
+from src.responses import Expm1
+from src.losses import Log1pMSELoss
 
 
 class MouseModel(argus.Model):
@@ -14,9 +14,9 @@ class MouseModel(argus.Model):
     }
     loss = {
         **pytorch_losses,
-        "log_mse": LogMSELoss,
+        "log1p_mse": Log1pMSELoss,
     }
     prediction_transform = {
         "identity": nn.Identity,
-        "exp": Exp,
+        "expm1": Expm1,
     }

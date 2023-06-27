@@ -18,8 +18,17 @@ class IdentityResponsesProcessor(ResponsesProcessor):
         return torch.from_numpy(responses)
 
 
+class IndexingResponsesProcessor(ResponsesProcessor):
+    def __init__(self, index: int):
+        self.index = index
+
+    def __call__(self, responses: np.ndarray) -> torch.Tensor:
+        return torch.from_numpy(responses[self.index])
+
+
 _RESPONSES_PROCESSOR_REGISTRY: dict[str, Type[ResponsesProcessor]] = dict(
     identity=IdentityResponsesProcessor,
+    indexing=IndexingResponsesProcessor,
 )
 
 
@@ -28,11 +37,6 @@ def get_responses_processor(name: str, processor_params: dict) -> ResponsesProce
     return _RESPONSES_PROCESSOR_REGISTRY[name](**processor_params)
 
 
-class Log(nn.Module):
+class Expm1(nn.Module):
     def forward(self, x):
-        return torch.log(x)
-
-
-class Exp(nn.Module):
-    def forward(self, x):
-        return torch.exp(x)
+        return torch.expm1(x)
