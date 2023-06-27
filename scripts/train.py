@@ -27,7 +27,7 @@ from src import constants
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--experiment", required=True, type=str)
-    parser.add_argument("-m", "--mouse_index", required=True, type=int)
+    parser.add_argument("-m", "--mice", default="all", type=str)
     return parser.parse_args()
 
 
@@ -36,7 +36,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     nn_module_params = argus_params["nn_module"][1]
     if nn_module_params["num_classes"] is None:
         nn_module_params["num_classes"] = constants.num_responses[mouse_index]
-        print(f"Set num classes {nn_module_params['num_classes']}")
+        print("Set num classes:", nn_module_params['num_classes'])
 
     model = MouseModel(argus_params)
 
@@ -56,14 +56,14 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         responses_processor=responses_processor,
         epoch_size=config["train_epoch_size"],
     )
-    print(f"Train dataset len {len(train_dataset)}")
+    print(f"Train dataset len:", len(train_dataset))
     val_dataset = ValMouseVideoDataset(
         constants.deeplake_path_format.format(mouse=mouse, split="val"),
         indexes_generator=indexes_generator,
         frames_processor=frames_processor,
         responses_processor=responses_processor,
     )
-    print(f"Val dataset len {len(val_dataset)}")
+    print(f"Val dataset len:", len(val_dataset))
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["batch_size"],
@@ -91,7 +91,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         elif stage == "train":
             checkpoint_format = "model-{epoch:03d}-{val_correlation:.6f}.pth"
             callbacks += [
-                Checkpoint(save_dir, file_format=checkpoint_format, max_saves=num_epochs),
+                Checkpoint(save_dir, file_format=checkpoint_format, max_saves=1),
                 CosineAnnealingLR(
                     T_max=num_iterations,
                     eta_min=get_lr(config["min_base_lr"], config["batch_size"]),
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     print("Experiment config:")
     pprint(config, sort_dicts=False)
 
-    experiments_dir = constants.experiments_dir / args.experiment / f"mouse_{args.mouse_index}"
+    experiments_dir = constants.experiments_dir / args.experiment
     print("Experiment dir:", experiments_dir)
     if not experiments_dir.exists():
         experiments_dir.mkdir(parents=True, exist_ok=True)
@@ -135,4 +135,12 @@ if __name__ == "__main__":
     with open(experiments_dir / "config.json", "w") as outfile:
         json.dump(config, outfile, indent=4)
 
-    train_mouse(config, experiments_dir, args.mouse_index)
+    if args.mice == "all":
+        mice_indexes = constants.mice_indexes
+    else:
+        mice_indexes = [int(index) for index in args.mice.split(",")]
+
+    for mouse_index in mice_indexes:
+        mouse_experiments_dir = experiments_dir / f"mouse_{mouse_index}"
+        print("Mouse experiment dir:", mouse_experiments_dir)
+        train_mouse(config, mouse_experiments_dir, mouse_index)
