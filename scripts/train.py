@@ -1,3 +1,4 @@
+import copy
 import json
 import argparse
 from pathlib import Path
@@ -32,6 +33,7 @@ def parse_arguments():
 
 
 def train_mouse(config: dict, save_dir: Path, mouse_index: int):
+    config = copy.deepcopy(config)
     argus_params = config["argus_params"]
     nn_module_params = argus_params["nn_module"][1]
     if nn_module_params["num_classes"] is None:
