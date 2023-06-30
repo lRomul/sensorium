@@ -109,7 +109,8 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
                   val_loader=val_loader,
                   num_epochs=num_epochs,
                   callbacks=callbacks,
-                  metrics=metrics)
+                  metrics=metrics,
+                  metrics_on_train=True)
 
 
 if __name__ == "__main__":

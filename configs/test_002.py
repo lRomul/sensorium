@@ -22,6 +22,7 @@ config = dict(
             "drop_rate": 0.2,
             "drop_path_rate": 0.2,
             "pretrained": True,
+            "use_stem_stride": False,
         }),
         "loss": "MSELoss",
         "optimizer": ("AdamW", {
