@@ -16,13 +16,13 @@ config = dict(
     num_dataloader_workers=8,
     argus_params={
         "nn_module": ("timm", {
-            "model_name": "tf_efficientnetv2_b0",
+            "model_name": "regnety_160.swag_ft_in1k",
             "num_classes": None,
             "in_chans": frame_stack_size,
             "drop_rate": 0.2,
             "drop_path_rate": 0.2,
             "pretrained": True,
-            "use_stem_stride": False,
+            "use_stem_stride": True,
         }),
         "loss": "MSELoss",
         "optimizer": ("AdamW", {
