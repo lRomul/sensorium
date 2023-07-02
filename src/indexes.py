@@ -1,10 +1,21 @@
 class StackIndexesGenerator:
-    def __init__(self, size: int, step: int):
+    def __init__(self, size: int, step: int, position: str = "last"):
         self.size = size
         self.step = step
 
-        self.behind = self.size // 2
-        self.ahead = self.size - self.behind - 1
+        if position == "first":
+            self.behind = 0
+            self.ahead = self.size - 1
+        elif position == "middle":
+            self.behind = self.size // 2
+            self.ahead = self.size - self.behind - 1
+        elif position == "last":
+            self.behind = self.size - 1
+            self.ahead = 0
+        else:
+            raise ValueError(
+                f"Index position value should be one of {'first', 'middle', 'last'}"
+            )
         self.behind *= self.step
         self.ahead *= self.step
 

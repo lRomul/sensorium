@@ -5,7 +5,7 @@ from timm import create_model
 from .utils import remove_stem_stride
 
 
-class TimmModel(nn.Module):
+class CustomTimmModel(nn.Module):
     def __init__(self,
                  model_name: str,
                  use_stem_stride: bool = True,

@@ -19,16 +19,22 @@ class IdentityResponsesProcessor(ResponsesProcessor):
 
 
 class IndexingResponsesProcessor(ResponsesProcessor):
-    def __init__(self, index: int):
+    def __init__(self, index: int | list[int]):
         self.index = index
 
     def __call__(self, responses: np.ndarray) -> torch.Tensor:
         return torch.from_numpy(responses[self.index])
 
 
+class SelectLastResponsesProcessor(IndexingResponsesProcessor):
+    def __init__(self):
+        super().__init__(index=-1)
+
+
 _RESPONSES_PROCESSOR_REGISTRY: dict[str, Type[ResponsesProcessor]] = dict(
     identity=IdentityResponsesProcessor,
     indexing=IndexingResponsesProcessor,
+    last=SelectLastResponsesProcessor,
 )
 
 

@@ -22,7 +22,6 @@ config = dict(
             "drop_rate": 0.2,
             "drop_path_rate": 0.2,
             "pretrained": True,
-            "use_stem_stride": True,
         }),
         "loss": "MSELoss",
         "optimizer": ("AdamW", {
@@ -33,15 +32,14 @@ config = dict(
         "device": "cuda:0",
         "frame_stack": {
             "size": frame_stack_size,
-            "step": 2
+            "step": 2,
+            "position": "last",
         },
         "frames_processor": ("normalize_pad", {
             "size": image_size,
             "pad_mode": "constant",
             "fill_value": 0,
         }),
-        "responses_processor": ("indexing", {
-            "index": -1,
-        })
+        "responses_processor": ("last", {}),
     },
 )

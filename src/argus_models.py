@@ -1,16 +1,18 @@
 from torch import nn
 
+import timm
 import argus
 from argus.loss import pytorch_losses
 
 from src.responses import Expm1
 from src.losses import Log1pMSELoss
-from src.models.timm import TimmModel
+from src.models.custom_timm import CustomTimmModel
 
 
 class MouseModel(argus.Model):
     nn_module = {
-        "timm": TimmModel,
+        "timm": timm.create_model,
+        "custom_timm": CustomTimmModel,
     }
     loss = {
         **pytorch_losses,
