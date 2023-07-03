@@ -2,7 +2,7 @@ from src.utils import get_lr
 
 
 image_size = (64, 64)
-batch_size = 8
+batch_size = 16
 base_lr = 3e-4
 frame_stack_size = 15
 config = dict(
@@ -10,6 +10,7 @@ config = dict(
     batch_size=batch_size,
     base_lr=base_lr,
     min_base_lr=base_lr * 0.01,
+    ema_decay=0.999,
     train_epoch_size=6000,
     num_epochs=[4, 20],
     stages=["warmup", "train"],
@@ -41,5 +42,7 @@ config = dict(
             "fill_value": 0,
         }),
         "responses_processor": ("last", {}),
+        "amp": False,
+        "iter_size": 1,
     },
 )
