@@ -24,6 +24,7 @@ from src.frames import get_frames_processor
 from src.metrics import CorrelationMetric
 from src.argus_models import MouseModel
 from src.utils import get_lr
+from src.mixup import Mixup
 from src import constants
 
 
@@ -58,7 +59,9 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     indexes_generator = StackIndexesGenerator(**argus_params["frame_stack"])
     frames_processor = get_frames_processor(*argus_params["frames_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
+
     train_augmentations = get_train_augmentations(size=config["image_size"])
+    mixup = Mixup(**config["mixup"]) if config["mixup"]["prob"] else None
 
     mouse = constants.index2mouse[mouse_index]
     train_dataset = TrainMouseVideoDataset(
@@ -68,6 +71,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         responses_processor=responses_processor,
         epoch_size=config["train_epoch_size"],
         augmentations=train_augmentations,
+        mixup=mixup,
     )
     print("Train dataset len:", len(train_dataset))
     val_dataset = ValMouseVideoDataset(

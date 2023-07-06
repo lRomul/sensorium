@@ -8,6 +8,7 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset
 
+from src.mixup import Mixup
 from src.utils import set_random_seed
 from src.frames import FramesProcessor
 from src.responses import ResponsesProcessor
@@ -19,12 +20,10 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
                  deeplake_path: str,
                  indexes_generator: StackIndexesGenerator,
                  frames_processor: FramesProcessor,
-                 responses_processor: ResponsesProcessor,
-                 augmentations: nn.Module | None = None):
+                 responses_processor: ResponsesProcessor):
         self.indexes_generator = indexes_generator
         self.frames_processor = frames_processor
         self.responses_processor = responses_processor
-        self.augmentations = augmentations
 
         self.deeplake_dataset = deeplake.load(deeplake_path, access_method="local")
         videos_shape = self.deeplake_dataset.videos.shape
@@ -65,13 +64,13 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
     def get_frame_indexes(self, index: int) -> tuple[int, list[int]]:
         pass
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_sample_tensors(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         video_index, frame_indexes = self.get_frame_indexes(index)
         frames, responses = self.get_frames_responses(video_index, frame_indexes)
-        tensor_frames, tensor_responses = self.process_frames_responses(frames, responses)
-        if self.augmentations is not None:
-            tensor_frames = self.augmentations(tensor_frames[None])[0]
-        return tensor_frames, tensor_responses
+        return self.process_frames_responses(frames, responses)
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        return self.get_sample_tensors(index)
 
 
 class TrainMouseVideoDataset(MouseVideoDataset):
@@ -81,10 +80,12 @@ class TrainMouseVideoDataset(MouseVideoDataset):
                  frames_processor: FramesProcessor,
                  responses_processor: ResponsesProcessor,
                  epoch_size: int,
-                 augmentations: nn.Module | None = None):
-        super().__init__(deeplake_path, indexes_generator, frames_processor,
-                         responses_processor, augmentations=augmentations)
+                 augmentations: nn.Module | None = None,
+                 mixup: Mixup | None = None):
+        super().__init__(deeplake_path, indexes_generator, frames_processor, responses_processor)
         self.epoch_size = epoch_size
+        self.augmentations = augmentations
+        self.mixup = mixup
 
     def __len__(self) -> int:
         return self.epoch_size
@@ -99,16 +100,27 @@ class TrainMouseVideoDataset(MouseVideoDataset):
         frame_indexes = self.indexes_generator.make_stack_indexes(frame_index)
         return video_index, frame_indexes
 
+    def get_sample_tensors(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        frames, responses = super().get_sample_tensors(index)
+        if self.augmentations is not None:
+            frames = self.augmentations(frames[None])[0]
+        return frames, responses
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        sample = self.get_sample_tensors(index)
+        if self.mixup is not None and self.mixup.use():
+            random_sample = self.get_sample_tensors(index + 1)
+            sample = self.mixup(sample, random_sample)
+        return sample
+
 
 class ValMouseVideoDataset(MouseVideoDataset):
     def __init__(self,
                  deeplake_path: str,
                  indexes_generator: StackIndexesGenerator,
                  frames_processor: FramesProcessor,
-                 responses_processor: ResponsesProcessor,
-                 augmentations: nn.Module | None = None):
-        super().__init__(deeplake_path, indexes_generator, frames_processor,
-                         responses_processor, augmentations=augmentations)
+                 responses_processor: ResponsesProcessor):
+        super().__init__(deeplake_path, indexes_generator, frames_processor, responses_processor)
         self.window_size = self.indexes_generator.ahead + self.indexes_generator.behind + 1
         self.samples_per_video = self.num_frames // self.window_size
 

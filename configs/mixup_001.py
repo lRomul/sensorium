@@ -45,4 +45,8 @@ config = dict(
         "amp": False,
         "iter_size": 1,
     },
+    mixup={
+        "alpha": 0.4,
+        "prob": 0.5,
+    },
 )
