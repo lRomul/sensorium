@@ -11,6 +11,7 @@ from argus.callbacks import (
     LoggingToFile,
     LoggingToCSV,
     CosineAnnealingLR,
+    Checkpoint,
     LambdaLR,
 )
 
@@ -47,8 +48,12 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     if "pretrained" in model.params["nn_module"][1]:
         nn_module_params["pretrained"] = False
 
-    print("EMA decay:", config["ema_decay"])
-    model.model_ema = ModelEma(model.nn_module, decay=config["ema_decay"])
+    if config["ema_decay"]:
+        print("EMA decay:", config["ema_decay"])
+        model.model_ema = ModelEma(model.nn_module, decay=config["ema_decay"])
+        checkpoint_class = EmaCheckpoint
+    else:
+        checkpoint_class = Checkpoint
 
     indexes_generator = StackIndexesGenerator(**argus_params["frame_stack"])
     frames_processor = get_frames_processor(*argus_params["frames_processor"])
@@ -99,7 +104,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         elif stage == "train":
             checkpoint_format = "model-{epoch:03d}-{val_correlation:.6f}.pth"
             callbacks += [
-                EmaCheckpoint(save_dir, file_format=checkpoint_format, max_saves=1),
+                checkpoint_class(save_dir, file_format=checkpoint_format, max_saves=1),
                 CosineAnnealingLR(
                     T_max=num_iterations,
                     eta_min=get_lr(config["min_base_lr"], config["batch_size"]),
