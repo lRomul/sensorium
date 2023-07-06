@@ -12,13 +12,13 @@ from argus.callbacks import (
     LoggingToCSV,
     CosineAnnealingLR,
     LambdaLR,
-    Checkpoint,
 )
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset
 from src.augmentations import get_train_augmentations
 from src.responses import get_responses_processor
 from src.indexes import StackIndexesGenerator
+from src.ema import ModelEma, EmaCheckpoint
 from src.frames import get_frames_processor
 from src.metrics import CorrelationMetric
 from src.argus_models import MouseModel
@@ -46,6 +46,9 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     nn_module_params = model.params["nn_module"][1]
     if "pretrained" in model.params["nn_module"][1]:
         nn_module_params["pretrained"] = False
+
+    print("EMA decay:", config["ema_decay"])
+    model.model_ema = ModelEma(model.nn_module, decay=config["ema_decay"])
 
     indexes_generator = StackIndexesGenerator(**argus_params["frame_stack"])
     frames_processor = get_frames_processor(*argus_params["frames_processor"])
@@ -96,7 +99,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         elif stage == "train":
             checkpoint_format = "model-{epoch:03d}-{val_correlation:.6f}.pth"
             callbacks += [
-                Checkpoint(save_dir, file_format=checkpoint_format, max_saves=1),
+                EmaCheckpoint(save_dir, file_format=checkpoint_format, max_saves=1),
                 CosineAnnealingLR(
                     T_max=num_iterations,
                     eta_min=get_lr(config["min_base_lr"], config["batch_size"]),
