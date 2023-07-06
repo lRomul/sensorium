@@ -16,6 +16,7 @@ from argus.callbacks import (
 )
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset
+from src.augmentations import get_train_augmentations
 from src.responses import get_responses_processor
 from src.indexes import StackIndexesGenerator
 from src.frames import get_frames_processor
@@ -49,6 +50,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     indexes_generator = StackIndexesGenerator(**argus_params["frame_stack"])
     frames_processor = get_frames_processor(*argus_params["frames_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
+    train_augmentations = get_train_augmentations(size=config["image_size"])
 
     mouse = constants.index2mouse[mouse_index]
     train_dataset = TrainMouseVideoDataset(
@@ -57,15 +59,16 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         frames_processor=frames_processor,
         responses_processor=responses_processor,
         epoch_size=config["train_epoch_size"],
+        augmentations=train_augmentations,
     )
-    print(f"Train dataset len:", len(train_dataset))
+    print("Train dataset len:", len(train_dataset))
     val_dataset = ValMouseVideoDataset(
         constants.deeplake_path_format.format(mouse=mouse, split="val"),
         indexes_generator=indexes_generator,
         frames_processor=frames_processor,
         responses_processor=responses_processor,
     )
-    print(f"Val dataset len:", len(val_dataset))
+    print("Val dataset len:", len(val_dataset))
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["batch_size"],

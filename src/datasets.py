@@ -5,6 +5,7 @@ import deeplake
 import numpy as np
 
 import torch
+from torch import nn
 from torch.utils.data import Dataset
 
 from src.utils import set_random_seed
@@ -18,10 +19,12 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
                  deeplake_path: str,
                  indexes_generator: StackIndexesGenerator,
                  frames_processor: FramesProcessor,
-                 responses_processor: ResponsesProcessor):
+                 responses_processor: ResponsesProcessor,
+                 augmentations: nn.Module | None = None):
         self.indexes_generator = indexes_generator
         self.frames_processor = frames_processor
         self.responses_processor = responses_processor
+        self.augmentations = augmentations
 
         self.deeplake_dataset = deeplake.load(deeplake_path, access_method="local")
         videos_shape = self.deeplake_dataset.videos.shape
@@ -65,7 +68,10 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         video_index, frame_indexes = self.get_frame_indexes(index)
         frames, responses = self.get_frames_responses(video_index, frame_indexes)
-        return self.process_frames_responses(frames, responses)
+        tensor_frames, tensor_responses = self.process_frames_responses(frames, responses)
+        if self.augmentations is not None:
+            tensor_frames = self.augmentations(tensor_frames[None])[0]
+        return tensor_frames, tensor_responses
 
 
 class TrainMouseVideoDataset(MouseVideoDataset):
@@ -74,8 +80,10 @@ class TrainMouseVideoDataset(MouseVideoDataset):
                  indexes_generator: StackIndexesGenerator,
                  frames_processor: FramesProcessor,
                  responses_processor: ResponsesProcessor,
-                 epoch_size: int):
-        super().__init__(deeplake_path, indexes_generator, frames_processor, responses_processor)
+                 epoch_size: int,
+                 augmentations: nn.Module | None = None):
+        super().__init__(deeplake_path, indexes_generator, frames_processor,
+                         responses_processor, augmentations=augmentations)
         self.epoch_size = epoch_size
 
     def __len__(self) -> int:
@@ -97,8 +105,10 @@ class ValMouseVideoDataset(MouseVideoDataset):
                  deeplake_path: str,
                  indexes_generator: StackIndexesGenerator,
                  frames_processor: FramesProcessor,
-                 responses_processor: ResponsesProcessor):
-        super().__init__(deeplake_path, indexes_generator, frames_processor, responses_processor)
+                 responses_processor: ResponsesProcessor,
+                 augmentations: nn.Module | None = None):
+        super().__init__(deeplake_path, indexes_generator, frames_processor,
+                         responses_processor, augmentations=augmentations)
         self.window_size = self.indexes_generator.ahead + self.indexes_generator.behind + 1
         self.samples_per_video = self.num_frames // self.window_size
 

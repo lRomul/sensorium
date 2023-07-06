@@ -11,10 +11,10 @@ def normalize_frames(frames: torch.Tensor) -> torch.Tensor:
     return frames
 
 
-def pad_to_frames(frames: torch.Tensor,
-                  size: tuple[int, int],
-                  pad_mode: str = "constant",
-                  fill_value: int = 0) -> torch.Tensor:
+def pad_frames(frames: torch.Tensor,
+               size: tuple[int, int],
+               pad_mode: str = "constant",
+               fill_value: int = 0) -> torch.Tensor:
     height, width = frames.shape[-2:]
     height_pad = size[1] - height
     width_pad = size[0] - width
@@ -51,9 +51,9 @@ class NormalizePadFramesProcessor(FramesProcessor):
     def __call__(self, frames: np.ndarray) -> torch.Tensor:
         tensor_frames = torch.from_numpy(frames)
         tensor_frames = normalize_frames(tensor_frames)
-        tensor_frames = pad_to_frames(tensor_frames, self.size,
-                                      pad_mode=self.pad_mode,
-                                      fill_value=self.fill_value)
+        tensor_frames = pad_frames(tensor_frames, self.size,
+                                   pad_mode=self.pad_mode,
+                                   fill_value=self.fill_value)
         return tensor_frames
 
 
