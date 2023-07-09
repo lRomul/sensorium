@@ -13,7 +13,7 @@ DOWNLOAD_URL_FORMAT = "https://gin.g-node.org/pollytur/Sensorium2023Data/raw/mas
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--path", default="data/sensorium", type=Path)
+    parser.add_argument("-p", "--path", default=constants.sensorium_dir, type=Path)
     parser.add_argument("-m", "--mice", default="all", type=str)
     return parser.parse_args()
 

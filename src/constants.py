@@ -3,6 +3,7 @@ from pathlib import Path
 work_dir = Path("/workdir")
 data_dir = work_dir / "data"
 deeplake_dir = data_dir / "deeplake"
+sensorium_dir = data_dir / "sensorium"
 
 configs_dir = work_dir / "configs"
 experiments_dir = data_dir / "experiments"
