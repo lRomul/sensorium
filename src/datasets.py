@@ -1,7 +1,6 @@
 import abc
 import random
 
-import deeplake
 import numpy as np
 
 import torch
@@ -17,27 +16,26 @@ from src.indexes import StackIndexesGenerator
 
 class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
     def __init__(self,
-                 deeplake_path: str,
+                 mouse_data: dict,
                  indexes_generator: StackIndexesGenerator,
                  frames_processor: FramesProcessor,
                  responses_processor: ResponsesProcessor):
+        self.mouse_data = mouse_data
         self.indexes_generator = indexes_generator
         self.frames_processor = frames_processor
         self.responses_processor = responses_processor
 
-        self.deeplake_dataset = deeplake.load(deeplake_path, access_method="local")
-        videos_shape = self.deeplake_dataset.videos.shape
-        self.num_videos = videos_shape[0]
-        self.num_frames = videos_shape[2]
-        self.num_responses = self.deeplake_dataset.responses.shape[2]
+        self.trials = self.mouse_data["trials"]
+        self.num_trials = len(self.trials)
+        self.trials_lengths = [t["length"] for t in self.trials]
+        self.num_neurons = self.mouse_data["num_neurons"]
 
     def get_frames(self, video_index: int, frame_indexes: list[int]) -> np.ndarray:
-        frames = self.deeplake_dataset.videos[video_index, 0, frame_indexes].numpy()
+        frames = np.load(self.trials[video_index]["video_path"])[..., frame_indexes]
         return frames
 
     def get_responses(self, video_index: int, frame_indexes: list[int]) -> np.ndarray:
-        responses = self.deeplake_dataset.responses[video_index, :, frame_indexes].numpy()
-        responses = np.transpose(responses, (1, 0))
+        responses = np.load(self.trials[video_index]["response_path"])[..., frame_indexes]
         return responses
 
     def get_frames_responses(
@@ -75,14 +73,14 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
 
 class TrainMouseVideoDataset(MouseVideoDataset):
     def __init__(self,
-                 deeplake_path: str,
+                 mouse_data: dict,
                  indexes_generator: StackIndexesGenerator,
                  frames_processor: FramesProcessor,
                  responses_processor: ResponsesProcessor,
                  epoch_size: int,
                  augmentations: nn.Module | None = None,
                  mixup: Mixup | None = None):
-        super().__init__(deeplake_path, indexes_generator, frames_processor, responses_processor)
+        super().__init__(mouse_data, indexes_generator, frames_processor, responses_processor)
         self.epoch_size = epoch_size
         self.augmentations = augmentations
         self.mixup = mixup
@@ -92,10 +90,11 @@ class TrainMouseVideoDataset(MouseVideoDataset):
 
     def get_frame_indexes(self, index: int) -> tuple[int, list[int]]:
         set_random_seed(index)
-        video_index = random.randrange(0, self.num_videos)
+        video_index = random.randrange(0, self.num_trials)
+        num_frames = self.trials[video_index]["length"]
         frame_index = random.randrange(
             self.indexes_generator.behind,
-            self.num_frames - self.indexes_generator.ahead
+            num_frames - self.indexes_generator.ahead
         )
         frame_indexes = self.indexes_generator.make_stack_indexes(frame_index)
         return video_index, frame_indexes
@@ -116,21 +115,27 @@ class TrainMouseVideoDataset(MouseVideoDataset):
 
 class ValMouseVideoDataset(MouseVideoDataset):
     def __init__(self,
-                 deeplake_path: str,
+                 mouse_data: dict,
                  indexes_generator: StackIndexesGenerator,
                  frames_processor: FramesProcessor,
                  responses_processor: ResponsesProcessor):
-        super().__init__(deeplake_path, indexes_generator, frames_processor, responses_processor)
+        super().__init__(mouse_data, indexes_generator, frames_processor, responses_processor)
         self.window_size = self.indexes_generator.ahead + self.indexes_generator.behind + 1
-        self.samples_per_video = self.num_frames // self.window_size
+        self.samples_per_videos = [length // self.window_size for length in self.trials_lengths]
 
     def __len__(self) -> int:
-        return self.num_videos * self.samples_per_video
+        return sum(self.samples_per_videos)
 
     def get_frame_indexes(self, index: int) -> tuple[int, list[int]]:
         assert 0 <= index < self.__len__()
-        video_index = index // self.samples_per_video
-        video_sample_index = index - video_index * self.samples_per_video
+        video_sample_index = index
+        video_index = 0
+        for video_index, num_video_samples in enumerate(self.samples_per_videos):
+            if video_sample_index >= num_video_samples:
+                video_sample_index -= num_video_samples
+            else:
+                break
+
         frame_index = self.indexes_generator.behind + video_sample_index * self.window_size
         frame_indexes = self.indexes_generator.make_stack_indexes(frame_index)
         return video_index, frame_indexes

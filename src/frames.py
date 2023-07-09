@@ -49,6 +49,7 @@ class NormalizePadFramesProcessor(FramesProcessor):
         self.fill_value = fill_value
 
     def __call__(self, frames: np.ndarray) -> torch.Tensor:
+        frames = np.transpose(frames, (2, 0, 1))
         tensor_frames = torch.from_numpy(frames)
         tensor_frames = normalize_frames(tensor_frames)
         tensor_frames = pad_frames(tensor_frames, self.size,

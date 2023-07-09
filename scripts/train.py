@@ -23,6 +23,7 @@ from src.ema import ModelEma, EmaCheckpoint
 from src.frames import get_frames_processor
 from src.metrics import CorrelationMetric
 from src.argus_models import MouseModel
+from src.data import get_mouse_data
 from src.utils import get_lr
 from src.mixup import Mixup
 from src import constants
@@ -40,7 +41,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     argus_params = config["argus_params"]
     nn_module_params = argus_params["nn_module"][1]
     if nn_module_params["num_classes"] is None:
-        nn_module_params["num_classes"] = constants.num_responses[mouse_index]
+        nn_module_params["num_classes"] = constants.num_neurons[mouse_index]
         print("Set num classes:", nn_module_params['num_classes'])
 
     model = MouseModel(argus_params)
@@ -65,7 +66,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
 
     mouse = constants.index2mouse[mouse_index]
     train_dataset = TrainMouseVideoDataset(
-        constants.deeplake_path_format.format(mouse=mouse, split="train"),
+        get_mouse_data(mouse=mouse, split="train"),
         indexes_generator=indexes_generator,
         frames_processor=frames_processor,
         responses_processor=responses_processor,
@@ -73,9 +74,10 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         augmentations=train_augmentations,
         mixup=mixup,
     )
+    assert constants.num_neurons[mouse_index] == train_dataset.num_neurons
     print("Train dataset len:", len(train_dataset))
     val_dataset = ValMouseVideoDataset(
-        constants.deeplake_path_format.format(mouse=mouse, split="val"),
+        get_mouse_data(mouse=mouse, split="val"),
         indexes_generator=indexes_generator,
         frames_processor=frames_processor,
         responses_processor=responses_processor,

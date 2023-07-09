@@ -23,7 +23,8 @@ class IndexingResponsesProcessor(ResponsesProcessor):
         self.index = index
 
     def __call__(self, responses: np.ndarray) -> torch.Tensor:
-        return torch.from_numpy(responses[self.index])
+        responses = responses[..., self.index]
+        return torch.from_numpy(responses)
 
 
 class SelectLastResponsesProcessor(IndexingResponsesProcessor):
