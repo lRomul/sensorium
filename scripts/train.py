@@ -163,6 +163,6 @@ if __name__ == "__main__":
         mice_indexes = [int(index) for index in args.mice.split(",")]
 
     for mouse_index in mice_indexes:
-        mouse_experiments_dir = experiments_dir / f"mouse_{mouse_index}"
+        mouse_experiments_dir = experiments_dir / f"mouse{mouse_index}"
         print("Mouse experiment dir:", mouse_experiments_dir)
         train_mouse(config, mouse_experiments_dir, mouse_index)
