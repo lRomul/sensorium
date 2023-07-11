@@ -41,7 +41,9 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     argus_params = config["argus_params"]
     nn_module_params = argus_params["nn_module"][1]
     if nn_module_params["num_classes"] is None:
-        nn_module_params["num_classes"] = constants.num_neurons[mouse_index]
+        num_neurons = constants.num_neurons[mouse_index]
+        nn_module_params["num_classes"] = num_neurons
+        argus_params["num_neurons"] = num_neurons
         print("Set num classes:", nn_module_params['num_classes'])
 
     model = MouseModel(argus_params)
