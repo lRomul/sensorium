@@ -56,7 +56,7 @@ def make_submission(experiment: str, split: str):
             data.append((mouse, prediction_filename, prediction.tolist(), neuron_ids))
     submission_df = pd.DataFrame.from_records(
         data,
-        columns=['mouse', 'trial_indices', 'predictions', 'neuron_ids']
+        columns=['mouse', 'trial_indices', 'prediction', 'neuron_ids']
     )
     split = split.replace('_test_', '_').replace('bonus', 'ood')
     submission_path = prediction_dir / f"predictions_{split}.parquet.brotli"
