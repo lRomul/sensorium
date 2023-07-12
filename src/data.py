@@ -23,6 +23,7 @@ def get_mouse_data(mouse: str, split: str):
     mouse_dir = constants.sensorium_dir / mouse
     trials = np.load(str(mouse_dir / "meta" / "trials" / "tiers.npy"))
     trial_ids = np.argwhere(trials == ("oracle" if split == "val" else split)).ravel().tolist()
+    neuron_ids = np.load(str(mouse_dir / "meta" / "neurons" / "unit_ids.npy"))
     cell_motor_coords = np.load(str(mouse_dir / "meta" / "neurons" / "cell_motor_coordinates.npy"))
 
     mouse_data = {
@@ -30,8 +31,9 @@ def get_mouse_data(mouse: str, split: str):
         "split": split,
         "labeled_split": labeled_split,
         "trial_ids": trial_ids,
+        "neuron_ids": neuron_ids,
+        "num_neurons": neuron_ids.shape[0],
         "cell_motor_coordinates": cell_motor_coords,
-        "num_neurons": cell_motor_coords.shape[0],
         "trials": [],
     }
 
