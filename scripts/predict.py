@@ -50,10 +50,10 @@ def make_submission(experiment: str, split: str):
         neuron_ids = mouse_data["neuron_ids"].tolist()
         mouse_prediction_dir = prediction_dir / f"mouse_{mouse_index}"
         for trial_data in mouse_data["trials"]:
-            prediction_filename = f"{trial_data['trial_id']}.npy"
-            prediction = np.load(str(mouse_prediction_dir / f"{trial_data['trial_id']}.npy"))
+            trial_id = trial_data['trial_id']
+            prediction = np.load(str(mouse_prediction_dir / f"{trial_id}.npy"))
             prediction = prediction[..., constants.submission_skip_first:]
-            data.append((mouse, prediction_filename, prediction.tolist(), neuron_ids))
+            data.append((mouse, trial_id, prediction.tolist(), neuron_ids))
     submission_df = pd.DataFrame.from_records(
         data,
         columns=['mouse', 'trial_indices', 'prediction', 'neuron_ids']
