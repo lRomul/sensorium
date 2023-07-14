@@ -27,3 +27,4 @@ labeled_splits = ["train", "val"]
 unlabeled_splits = ["live_test_main", "live_test_bonus", "final_test_main", "final_test_bonus"]
 
 submission_skip_first = 50
+submission_skip_last = 1

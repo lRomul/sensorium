@@ -53,6 +53,8 @@ def make_submission(experiment: str, split: str):
             trial_id = trial_data['trial_id']
             prediction = np.load(str(mouse_prediction_dir / f"{trial_id}.npy"))
             prediction = prediction[..., constants.submission_skip_first:]
+            if constants.submission_skip_last:
+                prediction = prediction[..., :-constants.submission_skip_last]
             data.append((mouse, trial_id, prediction.tolist(), neuron_ids))
     submission_df = pd.DataFrame.from_records(
         data,
