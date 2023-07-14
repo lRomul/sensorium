@@ -1,27 +1,32 @@
-import torch
+from typing import Union, Tuple
+
+import numpy as np
+from numpy.typing import ArrayLike
+
 from argus.metrics import Metric
-from argus.utils import AverageMeter
 
 
-def corr(y1, y2, dim=-1, eps=1e-8, **kwargs):
+def corr(
+    y1: ArrayLike, y2: ArrayLike, axis: Union[None, int, Tuple[int]] = -1, eps: int = 1e-8, **kwargs
+) -> np.ndarray:
     """
-    Compute the correlation between two PyTorch tensors along the specified dimension(s).
-    Source: https://github.com/sinzlab/neuralpredictors/blob/main/neuralpredictors/measures/functions.py
+    Compute the correlation between two NumPy arrays along the specified dimension(s).
 
     Args:
-        y1:      first PyTorch tensor
-        y2:      second PyTorch tensor
-        dim:     dimension(s) along which the correlation is computed.
-                 Any valid PyTorch dim spec works here
-        eps:     offset to the standard deviation to avoid exploding
-                 the correlation due to small division (default 1e-8)
-        **kwargs: passed to final `numpy.mean` operation over standardized y1 * y2
+        y1:      first NumPy array
+        y2:      second NumPy array
+        axis:    dimension(s) along which the correlation is computed. Any valid NumPy
+                 axis spec works here
+        eps:     offset to the standard deviation to avoid exploding the correlation due
+                 to small division (default 1e-8)
+        **kwargs: passed to final numpy.mean operation over standardized y1 * y2
 
-    Returns: correlation tensor
+    Returns: correlation array
     """
-    y1 = (y1 - y1.mean(dim=dim, keepdim=True)) / (y1.std(dim=dim, keepdim=True) + eps)
-    y2 = (y2 - y2.mean(dim=dim, keepdim=True)) / (y2.std(dim=dim, keepdim=True) + eps)
-    return (y1 * y2).mean(dim=dim, **kwargs)
+
+    y1 = (y1 - y1.mean(axis=axis, keepdims=True)) / (y1.std(axis=axis, keepdims=True, ddof=0) + eps)
+    y2 = (y2 - y2.mean(axis=axis, keepdims=True)) / (y2.std(axis=axis, keepdims=True, ddof=0) + eps)
+    return (y1 * y2).mean(axis=axis, **kwargs)
 
 
 class CorrelationMetric(Metric):
@@ -29,21 +34,22 @@ class CorrelationMetric(Metric):
     better: str = "max"
 
     def __init__(self):
-        self.avg_meter = AverageMeter()
         super().__init__()
+        self.predictions = []
+        self.targets = []
 
     def reset(self):
-        self.avg_meter.reset()
+        self.predictions = []
+        self.targets = []
 
-    @torch.no_grad()
     def update(self, step_output: dict):
-        prediction = step_output["prediction"]
-        target = step_output["target"]
-        correlations = corr(prediction, target, dim=-1)
-        for value in correlations.ravel():
-            self.avg_meter.update(value.item())
+        prediction = step_output["prediction"].cpu().numpy()
+        target = step_output["target"].cpu().numpy()
+
+        self.predictions.append(prediction)
+        self.targets.append(target)
 
     def compute(self):
-        if self.avg_meter.count == 0:
-            raise RuntimeError("Must be at least one example for computation")
-        return self.avg_meter.average
+        targets = np.concatenate(self.targets, axis=0)
+        predictions = np.concatenate(self.predictions, axis=0)
+        return corr(predictions, targets, axis=0).mean()
