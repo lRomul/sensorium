@@ -33,13 +33,13 @@ def pad_frames(frames: torch.Tensor,
     return frames
 
 
-class FramesProcessor(metaclass=abc.ABCMeta):
+class InputsProcessor(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def __call__(self, frames: np.ndarray) -> torch.Tensor:
+    def __call__(self, frames: np.ndarray, behavior: np.ndarray, pupil_center: np.ndarray) -> torch.Tensor:
         pass
 
 
-class NormalizePadFramesProcessor(FramesProcessor):
+class NormalizePadFramesProcessor(InputsProcessor):
     def __init__(self,
                  size: tuple[int, int],
                  pad_mode: str = "constant",
@@ -48,7 +48,7 @@ class NormalizePadFramesProcessor(FramesProcessor):
         self.pad_mode = pad_mode
         self.fill_value = fill_value
 
-    def __call__(self, frames: np.ndarray) -> torch.Tensor:
+    def __call__(self, frames: np.ndarray, behavior: np.ndarray, pupil_center: np.ndarray) -> torch.Tensor:
         frames = np.transpose(frames, (2, 0, 1))
         tensor_frames = torch.from_numpy(frames)
         tensor_frames = normalize_frames(tensor_frames)
@@ -58,11 +58,11 @@ class NormalizePadFramesProcessor(FramesProcessor):
         return tensor_frames
 
 
-_FRAME_PROCESSOR_REGISTRY: dict[str, Type[FramesProcessor]] = dict(
+_INPUTS_PROCESSOR_REGISTRY: dict[str, Type[InputsProcessor]] = dict(
     normalize_pad=NormalizePadFramesProcessor,
 )
 
 
-def get_frames_processor(name: str, processor_params: dict) -> FramesProcessor:
-    assert name in _FRAME_PROCESSOR_REGISTRY
-    return _FRAME_PROCESSOR_REGISTRY[name](**processor_params)
+def get_inputs_processor(name: str, processor_params: dict) -> InputsProcessor:
+    assert name in _INPUTS_PROCESSOR_REGISTRY
+    return _INPUTS_PROCESSOR_REGISTRY[name](**processor_params)

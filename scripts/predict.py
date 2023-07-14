@@ -22,7 +22,9 @@ def parse_arguments():
 def predict_trial(trial_data: dict, predictor: Predictor):
     length = trial_data["length"]
     video = np.load(trial_data["video_path"])[..., :length]
-    responses = predictor.predict_trial(video=video)
+    behavior = np.load(trial_data["behavior_path"])[..., :length]
+    pupil_center = np.load(trial_data["pupil_center_path"])[..., :length]
+    responses = predictor.predict_trial(video=video, behavior=behavior, pupil_center=pupil_center)
     return responses
 
 

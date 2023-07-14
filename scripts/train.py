@@ -20,7 +20,7 @@ from src.augmentations import get_train_augmentations
 from src.responses import get_responses_processor
 from src.indexes import StackIndexesGenerator
 from src.ema import ModelEma, EmaCheckpoint
-from src.frames import get_frames_processor
+from src.inputs import get_inputs_processor
 from src.metrics import CorrelationMetric
 from src.argus_models import MouseModel
 from src.data import get_mouse_data
@@ -60,7 +60,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         checkpoint_class = Checkpoint
 
     indexes_generator = StackIndexesGenerator(**argus_params["frame_stack"])
-    frames_processor = get_frames_processor(*argus_params["frames_processor"])
+    inputs_processor = get_inputs_processor(*argus_params["inputs_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
 
     train_augmentations = get_train_augmentations(size=config["image_size"])
@@ -70,7 +70,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     train_dataset = TrainMouseVideoDataset(
         get_mouse_data(mouse=mouse, split="train"),
         indexes_generator=indexes_generator,
-        frames_processor=frames_processor,
+        inputs_processor=inputs_processor,
         responses_processor=responses_processor,
         epoch_size=config["train_epoch_size"],
         augmentations=train_augmentations,
@@ -81,7 +81,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     val_dataset = ValMouseVideoDataset(
         get_mouse_data(mouse=mouse, split="val"),
         indexes_generator=indexes_generator,
-        frames_processor=frames_processor,
+        inputs_processor=inputs_processor,
         responses_processor=responses_processor,
     )
     print("Val dataset len:", len(val_dataset))

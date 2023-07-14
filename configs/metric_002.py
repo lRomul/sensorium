@@ -36,7 +36,7 @@ config = dict(
             "step": 2,
             "position": "last",
         },
-        "frames_processor": ("normalize_pad", {
+        "inputs_processor": ("normalize_pad", {
             "size": image_size,
             "pad_mode": "constant",
             "fill_value": 0,
