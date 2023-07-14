@@ -36,10 +36,8 @@ config = dict(
             "step": 2,
             "position": "last",
         },
-        "inputs_processor": ("normalize_pad", {
+        "inputs_processor": ("mosaic_inputs", {
             "size": image_size,
-            "pad_mode": "constant",
-            "fill_value": 0,
         }),
         "responses_processor": ("last", {}),
         "amp": False,

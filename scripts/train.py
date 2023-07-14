@@ -16,7 +16,6 @@ from argus.callbacks import (
 )
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset
-from src.augmentations import get_train_augmentations
 from src.responses import get_responses_processor
 from src.indexes import StackIndexesGenerator
 from src.ema import ModelEma, EmaCheckpoint
@@ -63,7 +62,6 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     inputs_processor = get_inputs_processor(*argus_params["inputs_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
 
-    train_augmentations = get_train_augmentations(size=config["image_size"])
     mixup = Mixup(**config["mixup"]) if config["mixup"]["prob"] else None
 
     mouse = constants.index2mouse[mouse_index]
@@ -73,7 +71,6 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
         inputs_processor=inputs_processor,
         responses_processor=responses_processor,
         epoch_size=config["train_epoch_size"],
-        augmentations=train_augmentations,
         mixup=mixup,
     )
     assert constants.num_neurons[mouse_index] == train_dataset.num_neurons

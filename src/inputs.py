@@ -6,11 +6,6 @@ import numpy as np
 import torch
 
 
-def normalize_frames(frames: torch.Tensor) -> torch.Tensor:
-    frames = frames.to(torch.float32) / 255.0
-    return frames
-
-
 def pad_frames(frames: torch.Tensor,
                size: tuple[int, int],
                pad_mode: str = "constant",
@@ -39,7 +34,7 @@ class InputsProcessor(metaclass=abc.ABCMeta):
         pass
 
 
-class NormalizePadFramesProcessor(InputsProcessor):
+class PadFramesProcessor(InputsProcessor):
     def __init__(self,
                  size: tuple[int, int],
                  pad_mode: str = "constant",
@@ -49,17 +44,43 @@ class NormalizePadFramesProcessor(InputsProcessor):
         self.fill_value = fill_value
 
     def __call__(self, frames: np.ndarray, behavior: np.ndarray, pupil_center: np.ndarray) -> torch.Tensor:
-        frames = np.transpose(frames, (2, 0, 1))
+        frames = np.transpose(frames.astype(np.float32), (2, 0, 1))
         tensor_frames = torch.from_numpy(frames)
-        tensor_frames = normalize_frames(tensor_frames)
         tensor_frames = pad_frames(tensor_frames, self.size,
                                    pad_mode=self.pad_mode,
                                    fill_value=self.fill_value)
         return tensor_frames
 
 
+def draw_inputs_squares(array: np.ndarray, size: tuple[int, int]):
+    width, height = size
+    assert width % 2 == 0
+    array = np.transpose(array, axes=(1, 0))[:, :, None, None]
+    tensor = torch.from_numpy(array)
+    tensor = torch.nn.functional.interpolate(tensor, (height, width // 2), mode="nearest")
+    tensor = torch.concatenate((tensor[:, 0], tensor[:, 1]), dim=2)
+    return tensor
+
+
+class MosaicInputsProcessor(InputsProcessor):
+    def __init__(self, size: tuple[int, int]):
+        self.size = size
+
+    def __call__(self, frames: np.ndarray, behavior: np.ndarray, pupil_center: np.ndarray) -> torch.Tensor:
+        frames = np.transpose(frames, (2, 0, 1))
+        tensor_frames = torch.from_numpy(frames)
+        height, width = frames.shape[-2:]
+        mosaic_height = self.size[1] - height
+        square_height = mosaic_height // 2
+        tensor_behavior = draw_inputs_squares(behavior, size=(width, square_height))
+        tensor_pupil_center = draw_inputs_squares(pupil_center, size=(width, mosaic_height - square_height))
+        tensor_input = torch.concatenate((tensor_behavior, tensor_frames, tensor_pupil_center), dim=1)
+        return tensor_input
+
+
 _INPUTS_PROCESSOR_REGISTRY: dict[str, Type[InputsProcessor]] = dict(
-    normalize_pad=NormalizePadFramesProcessor,
+    pad_frames=PadFramesProcessor,
+    mosaic_inputs=MosaicInputsProcessor,
 )
 
 
