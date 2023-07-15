@@ -16,7 +16,7 @@ config = dict(
     stages=["warmup", "train"],
     num_dataloader_workers=8,
     argus_params={
-        "nn_module": ("timm", {
+        "nn_module": ("custom_timm", {
             "model_name": "regnety_160.swag_ft_in1k",
             "num_classes": None,
             "in_chans": frame_stack_size,
@@ -24,7 +24,11 @@ config = dict(
             "drop_path_rate": 0.2,
             "pretrained": True,
         }),
-        "loss": "MSELoss",
+        "loss": ("PoissonNLLLoss", {
+            "log_input": False,
+            "full": False,
+            "reduction": "mean",
+        }),
         "optimizer": ("AdamW", {
             "lr": get_lr(base_lr, batch_size),
             "weight_decay": 0.01,
