@@ -9,7 +9,7 @@ from argus.utils import deep_to, deep_detach, deep_chunk
 
 from src.ema import ModelEma
 from src.responses import Expm1
-from src.losses import Log1pMSELoss
+from src.losses import Log1pPoissonLoss
 from src.models.custom_timm import CustomTimmModel
 
 
@@ -20,7 +20,7 @@ class MouseModel(argus.Model):
     }
     loss = {
         **pytorch_losses,
-        "log1p_mse": Log1pMSELoss,
+        "log1p_poisson": Log1pPoissonLoss,
     }
     prediction_transform = {
         "identity": nn.Identity,

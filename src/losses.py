@@ -2,12 +2,10 @@ import torch
 from torch import nn
 
 
-class Log1pMSELoss(nn.Module):
-    def __init__(self, size_average=None, reduce=None, reduction: str = "mean"):
+class Log1pPoissonLoss(nn.Module):
+    def __init__(self, log_input: bool = False, full: bool = False, reduction: str = "mean"):
         super().__init__()
-        self.mse = nn.MSELoss(size_average=size_average,
-                              reduce=reduce,
-                              reduction=reduction)
+        self.poisson = nn.PoissonNLLLoss(log_input=log_input, full=full, reduction=reduction)
 
     def forward(self, inputs, targets):
-        return self.mse(inputs, torch.log1p(targets))
+        return self.poisson(inputs, torch.log1p(targets))

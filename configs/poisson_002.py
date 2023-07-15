@@ -24,7 +24,7 @@ config = dict(
             "drop_path_rate": 0.2,
             "pretrained": True,
         }),
-        "loss": ("PoissonNLLLoss", {
+        "loss": ("log1p_poisson", {
             "log_input": False,
             "full": False,
             "reduction": "mean",
@@ -33,7 +33,7 @@ config = dict(
             "lr": get_lr(base_lr, batch_size),
             "weight_decay": 0.01,
         }),
-        "prediction_transform": "identity",
+        "prediction_transform": "expm1",
         "device": "cuda:0",
         "frame_stack": {
             "size": frame_stack_size,

@@ -15,9 +15,7 @@ class ResponsesProcessor(metaclass=abc.ABCMeta):
 
 class IdentityResponsesProcessor(ResponsesProcessor):
     def __call__(self, responses: np.ndarray) -> torch.Tensor:
-        tensor_responses = torch.from_numpy(responses)
-        tensor_responses = torch.log1p(tensor_responses)
-        return tensor_responses
+        return torch.from_numpy(responses)
 
 
 class IndexingResponsesProcessor(ResponsesProcessor):
@@ -26,9 +24,7 @@ class IndexingResponsesProcessor(ResponsesProcessor):
 
     def __call__(self, responses: np.ndarray) -> torch.Tensor:
         responses = responses[..., self.index]
-        tensor_responses = torch.from_numpy(responses)
-        tensor_responses = torch.log1p(tensor_responses)
-        return tensor_responses
+        return torch.from_numpy(responses)
 
 
 class SelectLastResponsesProcessor(IndexingResponsesProcessor):
