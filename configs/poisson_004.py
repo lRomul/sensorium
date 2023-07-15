@@ -26,7 +26,7 @@ config = dict(
         }),
         "loss": ("PoissonNLLLoss", {
             "log_input": False,
-            "full": False,
+            "full": True,
             "reduction": "mean",
         }),
         "optimizer": ("AdamW", {
