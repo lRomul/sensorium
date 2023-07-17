@@ -6,81 +6,38 @@ import numpy as np
 import torch
 
 
-def pad_frames(frames: torch.Tensor,
-               size: tuple[int, int],
-               pad_mode: str = "constant",
-               fill_value: int = 0) -> torch.Tensor:
-    height, width = frames.shape[-2:]
-    height_pad = size[1] - height
-    width_pad = size[0] - width
-    assert height_pad >= 0 and width_pad >= 0
-
-    top_height_pad: int = height_pad // 2
-    bottom_height_pad: int = height_pad - top_height_pad
-    left_width_pad: int = width_pad // 2
-    right_width_pad: int = width_pad - left_width_pad
-    frames = torch.nn.functional.pad(
-        frames,
-        [left_width_pad, right_width_pad, top_height_pad, bottom_height_pad],
-        mode=pad_mode,
-        value=fill_value,
-    )
-    return frames
-
-
 class InputsProcessor(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def __call__(self, frames: np.ndarray, behavior: np.ndarray, pupil_center: np.ndarray) -> torch.Tensor:
         pass
 
 
-class PadFramesProcessor(InputsProcessor):
+class StackInputsProcessor(InputsProcessor):
     def __init__(self,
                  size: tuple[int, int],
-                 pad_mode: str = "constant",
-                 fill_value: int = 0):
+                 pad_fill_value: int = 0):
         self.size = size
-        self.pad_mode = pad_mode
-        self.fill_value = fill_value
+        self.pad_fill_value = pad_fill_value
 
     def __call__(self, frames: np.ndarray, behavior: np.ndarray, pupil_center: np.ndarray) -> torch.Tensor:
+        length = frames.shape[-1]
+        input_array = np.full((5, length, self.size[1], self.size[0]), self.pad_fill_value, dtype=np.float32)
+
         frames = np.transpose(frames.astype(np.float32), (2, 0, 1))
-        tensor_frames = torch.from_numpy(frames)
-        tensor_frames = pad_frames(tensor_frames, self.size,
-                                   pad_mode=self.pad_mode,
-                                   fill_value=self.fill_value)
+        height, width = frames.shape[-2:]
+        height_start = (self.size[1] - height) // 2
+        width_start = (self.size[0] - width) // 2
+        input_array[0, :, height_start: height_start + height, width_start: width_start + width] = frames
+
+        input_array[1:3] = behavior[:, :, None, None]
+        input_array[3:] = pupil_center[:, :, None, None]
+
+        tensor_frames = torch.from_numpy(input_array)
         return tensor_frames
 
 
-def draw_inputs_squares(array: np.ndarray, size: tuple[int, int]):
-    width, height = size
-    assert width % 2 == 0
-    array = np.transpose(array, axes=(1, 0))[:, :, None, None]
-    tensor = torch.from_numpy(array)
-    tensor = torch.nn.functional.interpolate(tensor, (height, width // 2), mode="nearest")
-    tensor = torch.concatenate((tensor[:, 0], tensor[:, 1]), dim=2)
-    return tensor
-
-
-class MosaicInputsProcessor(InputsProcessor):
-    def __init__(self, size: tuple[int, int]):
-        self.size = size
-
-    def __call__(self, frames: np.ndarray, behavior: np.ndarray, pupil_center: np.ndarray) -> torch.Tensor:
-        frames = np.transpose(frames, (2, 0, 1))
-        tensor_frames = torch.from_numpy(frames)
-        height, width = frames.shape[-2:]
-        mosaic_height = self.size[1] - height
-        square_height = mosaic_height // 2
-        tensor_behavior = draw_inputs_squares(behavior, size=(width, square_height))
-        tensor_pupil_center = draw_inputs_squares(pupil_center, size=(width, mosaic_height - square_height))
-        tensor_input = torch.concatenate((tensor_behavior, tensor_frames, tensor_pupil_center), dim=1)
-        return tensor_input
-
-
 _INPUTS_PROCESSOR_REGISTRY: dict[str, Type[InputsProcessor]] = dict(
-    pad_frames=PadFramesProcessor,
-    mosaic_inputs=MosaicInputsProcessor,
+    stack_inputs=StackInputsProcessor,
 )
 
 

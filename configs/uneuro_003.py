@@ -18,7 +18,7 @@ config = dict(
     argus_params={
         "nn_module": ("uneuro", {
             "num_classes": None,
-            "in_channels": 1,
+            "in_channels": 5,
             "num_stem_features": 64,
             "num_block_features": (128, 256, 512, 1024),
             "block_strides": (2, 2, 2, 2),
@@ -44,8 +44,9 @@ config = dict(
             "step": 2,
             "position": "last",
         },
-        "inputs_processor": ("mosaic_inputs", {
+        "inputs_processor": ("stack_inputs", {
             "size": image_size,
+            "pad_fill_value": 0.,
         }),
         "responses_processor": ("last", {}),
         "amp": False,

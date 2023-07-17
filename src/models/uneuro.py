@@ -162,7 +162,6 @@ class UNeuro(nn.Module):
         self.activation = nn.Softplus(beta=1, threshold=20)
 
     def forward_3d(self, x):
-        x = x.unsqueeze(1)
         x = self.conv1(x)
         x = self.bn1(x)
         b, _, t, h, w = x.shape

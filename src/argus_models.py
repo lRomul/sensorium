@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 
-import timm
 import argus
 from argus.engine import State
 from argus.loss import pytorch_losses
@@ -11,13 +10,10 @@ from src.ema import ModelEma
 from src.responses import Expm1
 from src.models.uneuro import UNeuro
 from src.losses import Log1pPoissonLoss
-from src.models.custom_timm import CustomTimmModel
 
 
 class MouseModel(argus.Model):
     nn_module = {
-        "timm": timm.create_model,
-        "custom_timm": CustomTimmModel,
         "uneuro": UNeuro,
     }
     loss = {
