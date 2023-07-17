@@ -9,6 +9,7 @@ from argus.utils import deep_to, deep_detach, deep_chunk
 
 from src.ema import ModelEma
 from src.responses import Expm1
+from src.models.uneuro import UNeuro
 from src.losses import Log1pPoissonLoss
 from src.models.custom_timm import CustomTimmModel
 
@@ -17,6 +18,7 @@ class MouseModel(argus.Model):
     nn_module = {
         "timm": timm.create_model,
         "custom_timm": CustomTimmModel,
+        "uneuro": UNeuro,
     }
     loss = {
         **pytorch_losses,

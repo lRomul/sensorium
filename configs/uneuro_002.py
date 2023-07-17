@@ -16,17 +16,21 @@ config = dict(
     stages=["warmup", "train"],
     num_dataloader_workers=8,
     argus_params={
-        "nn_module": ("custom_timm", {
-            "model_name": "regnety_160.swag_ft_in1k",
+        "nn_module": ("uneuro", {
             "num_classes": None,
-            "in_chans": frame_stack_size,
-            "drop_rate": 0.2,
-            "drop_path_rate": 0.2,
-            "pretrained": True,
+            "in_channels": 1,
+            "num_stem_features": 64,
+            "num_block_features": (128, 256, 512, 1024),
+            "block_strides": (2, 2, 2, 2),
+            "expansion_ratio": 3,
+            "se_reduce_ratio": 32,
+            "drop_rate": 0.0,
+            "drop_path_rate": 0.0,
+            "act_layer": "silu",
         }),
         "loss": ("PoissonNLLLoss", {
             "log_input": False,
-            "full": True,
+            "full": False,
             "reduction": "mean",
         }),
         "optimizer": ("AdamW", {
