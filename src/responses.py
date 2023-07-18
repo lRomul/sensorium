@@ -7,6 +7,12 @@ import torch
 from torch import nn
 
 
+def responses_to_tensor(responses: np.ndarray) -> torch.Tensor:
+    responses_tensor = torch.from_numpy(responses)
+    responses_tensor = torch.relu(responses_tensor)
+    return responses_tensor
+
+
 class ResponsesProcessor(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def __call__(self, responses: np.ndarray) -> torch.Tensor:
@@ -15,7 +21,7 @@ class ResponsesProcessor(metaclass=abc.ABCMeta):
 
 class IdentityResponsesProcessor(ResponsesProcessor):
     def __call__(self, responses: np.ndarray) -> torch.Tensor:
-        return torch.from_numpy(responses)
+        return responses_to_tensor(responses)
 
 
 class IndexingResponsesProcessor(ResponsesProcessor):
@@ -24,9 +30,8 @@ class IndexingResponsesProcessor(ResponsesProcessor):
 
     def __call__(self, responses: np.ndarray) -> torch.Tensor:
         responses = responses[..., self.index]
-        torch_tensor = torch.from_numpy(responses)
-        torch_tensor = torch.relu(torch_tensor)
-        return torch_tensor
+        responses_tensor = responses_to_tensor(responses)
+        return responses_tensor
 
 
 class SelectLastResponsesProcessor(IndexingResponsesProcessor):

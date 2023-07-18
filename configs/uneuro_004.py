@@ -4,7 +4,7 @@ from src.utils import get_lr
 image_size = (64, 64)
 batch_size = 16
 base_lr = 3e-4
-frame_stack_size = 15
+frame_stack_size = 16
 config = dict(
     image_size=image_size,
     batch_size=batch_size,
@@ -12,7 +12,7 @@ config = dict(
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
     train_epoch_size=6000,
-    num_epochs=[4, 20],
+    num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=8,
     argus_params={
@@ -48,7 +48,7 @@ config = dict(
             "size": image_size,
             "pad_fill_value": 0.,
         }),
-        "responses_processor": ("last", {}),
+        "responses_processor": ("identity", {}),
         "amp": False,
         "iter_size": 1,
     },

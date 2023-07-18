@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 
 from timm.layers import (
@@ -157,28 +158,25 @@ class UNeuro(nn.Module):
             prev_num_features = num_features
         self.blocks = nn.Sequential(*blocks)
 
-        self.global_pool = nn.AdaptiveAvgPool2d(1)
+        self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
         self.classifier = nn.Linear(prev_num_features, num_classes, bias=True)
         self.activation = nn.Softplus(beta=1, threshold=20)
 
-    def forward_3d(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        b, _, t, h, w = x.shape
-        x = self.blocks(x)
-        x = x[:, :, -1]
-        return x
+    def forward(self, x: torch.Tensor):
+        x = self.conv1(x)  # (4, 32, 15, 32, 32)
+        x = self.bn1(x)  # (4, 32, 15, 32, 32)
+        x = self.blocks(x)  # (4, 512, 15, 2, 2)
+        x = self.pool(x).squeeze(-1).squeeze(-1)  # (4, 512, 15)
 
-    def forward_head(self, x):
-        x = self.global_pool(x)
-        x = x.view(x.shape[0], -1)
         if self.drop_rate > 0.:
             x = nn.functional.dropout(x, p=self.drop_rate, training=self.training)
-        x = self.classifier(x)
-        x = self.activation(x)
-        return x
 
-    def forward(self, x):
-        x = self.forward_3d(x)
-        x = self.forward_head(x)
+        x = torch.transpose(x, 1, 2)  # (4, 15, 512)
+        b, t, c = x.shape
+        x = x.reshape(b * t, c)  # (60, 512)
+        x = self.classifier(x)  # (60, 7440)
+        x = x.view(b, t, -1)  # (4, 15, 7440)
+        x = torch.transpose(x, 1, 2)  # (4, 7440, 15)
+
+        x = self.activation(x)  # (4, 7440, 15)
         return x

@@ -3,6 +3,8 @@ from typing import Union, Tuple
 import numpy as np
 from numpy.typing import ArrayLike
 
+import torch
+
 from argus.metrics import Metric
 
 
@@ -43,11 +45,17 @@ class CorrelationMetric(Metric):
         self.targets = []
 
     def update(self, step_output: dict):
-        prediction = step_output["prediction"].cpu().numpy()
-        target = step_output["target"].cpu().numpy()
+        prediction = step_output["prediction"]
+        target = step_output["target"]
 
-        self.predictions.append(prediction)
-        self.targets.append(target)
+        if len(target.shape) == 3:
+            prediction = torch.transpose(prediction, 1, 2)
+            prediction = prediction.reshape(-1, prediction.shape[-1])
+            target = torch.transpose(target, 1, 2)
+            target = target.reshape(-1, target.shape[-1])
+
+        self.predictions.append(prediction.cpu().numpy())
+        self.targets.append(target.cpu().numpy())
 
     def compute(self):
         targets = np.concatenate(self.targets, axis=0)
