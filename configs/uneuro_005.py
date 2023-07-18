@@ -25,8 +25,6 @@ config = dict(
             "expansion_ratio": 3,
             "se_reduce_ratio": 32,
             "drop_rate": 0.0,
-            "drop_path_rate": 0.0,
-            "act_layer": "silu",
         }),
         "loss": ("PoissonNLLLoss", {
             "log_input": False,
