@@ -96,10 +96,9 @@ class UNeuro(nn.Module):
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  drop_rate: bool = 0.,
+                 num_readout_features: int = 1024,
                  act_layer: Type = nn.SiLU):
         super().__init__()
-        self.drop_rate = drop_rate
-
         self.conv1 = nn.Conv3d(in_channels, num_stem_features,
                                kernel_size=(3, 3, 3), stride=(1, 2, 2),
                                dilation=(1, 1, 1), padding=(1, 1, 1))
@@ -120,10 +119,15 @@ class UNeuro(nn.Module):
             ]
             prev_num_features = num_features
         self.blocks = nn.Sequential(*blocks)
-
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
-        self.classifier = nn.Conv1d(prev_num_features, num_classes, (1,))
+        self.readout = nn.Sequential(
+            nn.Dropout1d(p=drop_rate / 2, inplace=True),
+            nn.Conv1d(prev_num_features, num_readout_features, (1,), bias=False),
+            BatchNormAct(num_readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+            nn.Dropout1d(p=drop_rate, inplace=True),
+            nn.Conv1d(num_readout_features, num_classes, (1,)),
+        )
         self.gate = nn.Softplus(beta=1, threshold=20)
 
     def forward(self, x: torch.Tensor):
@@ -131,9 +135,6 @@ class UNeuro(nn.Module):
         x = self.bn1(x)  # (4, 32, 16, 32, 32)
         x = self.blocks(x)  # (4, 512, 16, 2, 2)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (4, 512, 16)
-
-        if self.drop_rate > 0.:
-            x = nn.functional.dropout(x, p=self.drop_rate, training=self.training)
-        x = self.classifier(x)
+        x = self.readout(x)  # (4, 7440, 16)
         x = self.gate(x)  # (4, 7440, 16)
         return x

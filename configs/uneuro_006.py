@@ -24,7 +24,8 @@ config = dict(
             "block_strides": (2, 2, 2, 2),
             "expansion_ratio": 3,
             "se_reduce_ratio": 32,
-            "drop_rate": 0.0,
+            "drop_rate": 0.2,
+            "num_readout_features": 2048,
         }),
         "loss": ("PoissonNLLLoss", {
             "log_input": False,
