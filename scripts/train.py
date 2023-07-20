@@ -22,7 +22,6 @@ from src.ema import ModelEma, EmaCheckpoint
 from src.inputs import get_inputs_processor
 from src.metrics import CorrelationMetric
 from src.argus_models import MouseModel
-from src.data import get_mouse_data
 from src.utils import get_lr
 from src.mixup import Mixup
 from src import constants
@@ -66,7 +65,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
 
     mouse = constants.index2mouse[mouse_index]
     train_dataset = TrainMouseVideoDataset(
-        get_mouse_data(mouse=mouse, split="train"),
+        mouse=mouse,
         indexes_generator=indexes_generator,
         inputs_processor=inputs_processor,
         responses_processor=responses_processor,
@@ -76,7 +75,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     assert constants.num_neurons[mouse_index] == train_dataset.num_neurons
     print("Train dataset len:", len(train_dataset))
     val_dataset = ValMouseVideoDataset(
-        get_mouse_data(mouse=mouse, split="val"),
+        mouse=mouse,
         indexes_generator=indexes_generator,
         inputs_processor=inputs_processor,
         responses_processor=responses_processor,
