@@ -168,7 +168,7 @@ class ConcatMiceVideoDataset(Dataset):
     def __len__(self):
         return self.num_samples
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, list[torch.Tensor], torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, tuple[list[torch.Tensor], torch.Tensor]]:
         assert 0 <= index < self.__len__()
         sample_index = index
         mouse_index = 0
@@ -183,4 +183,4 @@ class ConcatMiceVideoDataset(Dataset):
         target_tensors[mouse_index] = target_tensor
         mice_weights = torch.zeros(constants.num_mice, dtype=torch.float32)
         mice_weights[mouse_index] = 1.0
-        return input_tensor, target_tensors, mice_weights
+        return input_tensor, (target_tensors, mice_weights)

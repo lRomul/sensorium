@@ -21,7 +21,7 @@ class MouseModel(argus.Model):
         "log1p_poisson": Log1pPoissonLoss,
     }
     prediction_transform = {
-        "identity": nn.Identity,
+        "identity": lambda x: x,
         "expm1": Expm1,
     }
 
