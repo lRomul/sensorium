@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from src import constants
 
-DOWNLOAD_URL_FORMAT = "https://gin.g-node.org/pollytur/Sensorium2023Data/raw/master/{file_name}"
+DOWNLOAD_URL_FORMAT = "https://gin.g-node.org/pollytur/sensorium_2023_dataset/raw/master/{file_name}"
 
 
 def parse_arguments():
