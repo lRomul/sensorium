@@ -100,8 +100,8 @@ class UNeuro(nn.Module):
                  act_layer: Type = nn.SiLU):
         super().__init__()
         self.conv1 = nn.Conv3d(in_channels, stem_features,
-                               kernel_size=(3, 3, 3), stride=(1, 2, 2),
-                               dilation=(1, 1, 1), padding=(1, 1, 1))
+                               kernel_size=(1, 3, 3), stride=(1, 2, 2),
+                               dilation=(1, 1, 1), padding=(0, 1, 1))
         self.bn1 = BatchNormAct(stem_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer)
 
         blocks = []
