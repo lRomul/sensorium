@@ -15,7 +15,7 @@ from argus.callbacks import (
     LambdaLR,
 )
 
-from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset
+from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset, ConcatMiceVideoDataset
 from src.responses import get_responses_processor
 from src.indexes import StackIndexesGenerator
 from src.ema import ModelEma, EmaCheckpoint
@@ -30,19 +30,12 @@ from src import constants
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--experiment", required=True, type=str)
-    parser.add_argument("-m", "--mice", default="all", type=str)
     return parser.parse_args()
 
 
-def train_mouse(config: dict, save_dir: Path, mouse_index: int):
+def train_mouse(config: dict, save_dir: Path):
     config = copy.deepcopy(config)
     argus_params = config["argus_params"]
-    nn_module_params = argus_params["nn_module"][1]
-    if nn_module_params["num_classes"] is None:
-        num_neurons = constants.num_neurons[mouse_index]
-        nn_module_params["num_classes"] = num_neurons
-        argus_params["num_neurons"] = num_neurons
-        print("Set num classes:", nn_module_params['num_classes'])
 
     model = MouseModel(argus_params)
 
@@ -62,29 +55,39 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
 
     mixup = Mixup(**config["mixup"]) if config["mixup"]["prob"] else None
-
-    mouse = constants.index2mouse[mouse_index]
-    train_dataset = TrainMouseVideoDataset(
-        mouse=mouse,
-        indexes_generator=indexes_generator,
-        inputs_processor=inputs_processor,
-        responses_processor=responses_processor,
-        epoch_size=config["train_epoch_size"],
-        mixup=mixup,
-    )
-    assert constants.num_neurons[mouse_index] == train_dataset.num_neurons
+    train_datasets = []
+    mouse_epoch_size = config["train_epoch_size"] // constants.num_mice
+    for mouse in constants.mice:
+        train_datasets += [
+            TrainMouseVideoDataset(
+                mouse=mouse,
+                indexes_generator=indexes_generator,
+                inputs_processor=inputs_processor,
+                responses_processor=responses_processor,
+                epoch_size=mouse_epoch_size,
+                mixup=mixup,
+            )
+        ]
+    train_dataset = ConcatMiceVideoDataset(train_datasets)
     print("Train dataset len:", len(train_dataset))
-    val_dataset = ValMouseVideoDataset(
-        mouse=mouse,
-        indexes_generator=indexes_generator,
-        inputs_processor=inputs_processor,
-        responses_processor=responses_processor,
-    )
+    val_datasets = []
+    for mouse in constants.mice:
+        val_datasets += [
+            ValMouseVideoDataset(
+                mouse=mouse,
+                indexes_generator=indexes_generator,
+                inputs_processor=inputs_processor,
+                responses_processor=responses_processor,
+            )
+        ]
+    val_dataset = ConcatMiceVideoDataset(val_datasets)
     print("Val dataset len:", len(val_dataset))
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["batch_size"],
         num_workers=config["num_dataloader_workers"],
+        shuffle=True,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -106,7 +109,7 @@ def train_mouse(config: dict, save_dir: Path, mouse_index: int):
                          step_on_iteration=True),
             ]
         elif stage == "train":
-            checkpoint_format = "model-{epoch:03d}-{val_correlation:.6f}.pth"
+            checkpoint_format = "model-{epoch:03d}-{val_corr:.6f}.pth"
             callbacks += [
                 checkpoint_class(save_dir, file_format=checkpoint_format, max_saves=1),
                 CosineAnnealingLR(
@@ -152,12 +155,4 @@ if __name__ == "__main__":
     with open(experiments_dir / "config.json", "w") as outfile:
         json.dump(config, outfile, indent=4)
 
-    if args.mice == "all":
-        mice_indexes = constants.mice_indexes
-    else:
-        mice_indexes = [int(index) for index in args.mice.split(",")]
-
-    for mouse_index in mice_indexes:
-        mouse_experiments_dir = experiments_dir / f"mouse_{mouse_index}"
-        print("Mouse experiment dir:", mouse_experiments_dir)
-        train_mouse(config, mouse_experiments_dir, mouse_index)
+    train_mouse(config, experiments_dir)

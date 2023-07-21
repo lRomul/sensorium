@@ -4,12 +4,11 @@ from torch import nn
 import argus
 from argus.engine import State
 from argus.loss import pytorch_losses
-from argus.utils import deep_to, deep_detach, deep_chunk
+from argus.utils import deep_to, deep_detach, deep_chunk, Identity
 
 from src.ema import ModelEma
-from src.responses import Expm1
 from src.models.uneuro import UNeuro
-from src.losses import Log1pPoissonLoss
+from src.losses import MicePoissonLoss
 
 
 class MouseModel(argus.Model):
@@ -18,11 +17,10 @@ class MouseModel(argus.Model):
     }
     loss = {
         **pytorch_losses,
-        "log1p_poisson": Log1pPoissonLoss,
+        "mice_poisson": MicePoissonLoss,
     }
     prediction_transform = {
-        "identity": lambda x: x,
-        "expm1": Expm1,
+        "identity": Identity,
     }
 
     def __init__(self, params: dict):

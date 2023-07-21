@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Union, Tuple
 
 import numpy as np
@@ -32,32 +33,51 @@ def corr(
 
 
 class CorrelationMetric(Metric):
-    name: str = "correlation"
+    name: str = "corr"
     better: str = "max"
 
     def __init__(self):
         super().__init__()
-        self.predictions = []
-        self.targets = []
+        self.predictions = defaultdict(list)
+        self.targets = defaultdict(list)
+        self.weights = defaultdict(list)
 
     def reset(self):
-        self.predictions = []
-        self.targets = []
+        self.predictions = defaultdict(list)
+        self.targets = defaultdict(list)
+        self.weights = defaultdict(list)
 
     def update(self, step_output: dict):
-        prediction = step_output["prediction"]
-        target = step_output["target"]
+        pred_tensors = step_output["prediction"]
+        target_tensors, mice_weights = step_output["target"]
 
-        if len(target.shape) == 3:
-            prediction = torch.transpose(prediction, 1, 2)
-            prediction = prediction.reshape(-1, prediction.shape[-1])
-            target = torch.transpose(target, 1, 2)
-            target = target.reshape(-1, target.shape[-1])
+        for mouse_index, (pred, target) in enumerate(zip(pred_tensors, target_tensors)):
+            mouse_weight = mice_weights[..., mouse_index]
+            mask = mouse_weight != 0.0
+            if torch.any(mask):
+                pred, target = pred[mask], target[mask]
 
-        self.predictions.append(prediction.cpu().numpy())
-        self.targets.append(target.cpu().numpy())
+                if len(target.shape) == 3:
+                    pred = torch.transpose(pred, 1, 2)
+                    pred = pred.reshape(-1, pred.shape[-1])
+                    target = torch.transpose(target, 1, 2)
+                    target = target.reshape(-1, target.shape[-1])
+
+                self.predictions[mouse_index].append(pred.cpu().numpy())
+                self.targets[mouse_index].append(target.cpu().numpy())
 
     def compute(self):
-        targets = np.concatenate(self.targets, axis=0)
-        predictions = np.concatenate(self.predictions, axis=0)
-        return corr(predictions, targets, axis=0).mean()
+        mice_corr = dict()
+        for mouse_index in self.predictions:
+            targets = np.concatenate(self.targets[mouse_index], axis=0)
+            predictions = np.concatenate(self.predictions[mouse_index], axis=0)
+            mice_corr[mouse_index] = corr(predictions, targets, axis=0).mean()
+        return mice_corr
+
+    def epoch_complete(self, state):
+        with torch.no_grad():
+            mice_corr = self.compute()
+        name_prefix = f"{state.phase}_" if state.phase else ''
+        for mouse_index, mouse_corr in mice_corr.items():
+            state.metrics[name_prefix + self.name + f"_mouse_{mouse_index}"] = mouse_corr
+        state.metrics[name_prefix + self.name] = np.mean(list(mice_corr.values()))

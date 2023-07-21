@@ -178,9 +178,14 @@ class ConcatMiceVideoDataset(Dataset):
             else:
                 break
         input_tensor, target_tensor = self.mice_datasets[mouse_index][sample_index]
-        empty_target_tensor = torch.zeros_like(target_tensor)
-        target_tensors = [empty_target_tensor.clone().detach()] * constants.num_mice
-        target_tensors[mouse_index] = target_tensor
+        target_tensors = []
+        for index in constants.mice_indexes:
+            if index == mouse_index:
+                target_tensors.append(target_tensor)
+            else:
+                target_tensors.append(
+                    torch.zeros(constants.num_neurons[index], target_tensor.shape[-1], dtype=torch.float32)
+                )
         mice_weights = torch.zeros(constants.num_mice, dtype=torch.float32)
         mice_weights[mouse_index] = 1.0
         return input_tensor, (target_tensors, mice_weights)

@@ -125,10 +125,10 @@ class UNeuro(nn.Module):
         for readout_output in readout_outputs:
             self.readouts += [
                 nn.Sequential(
-                    nn.Dropout1d(p=drop_rate / 2, inplace=True),
+                    nn.Dropout1d(p=drop_rate / 2),
                     nn.Conv1d(prev_num_features, readout_features, (1,), bias=False),
                     BatchNormAct(readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-                    nn.Dropout1d(p=drop_rate, inplace=True),
+                    nn.Dropout1d(p=drop_rate),
                     nn.Conv1d(readout_features, readout_output, (1,)),
                 )
             ]

@@ -2,10 +2,19 @@ import torch
 from torch import nn
 
 
-class Log1pPoissonLoss(nn.Module):
-    def __init__(self, log_input: bool = False, full: bool = False, reduction: str = "mean"):
+class MicePoissonLoss(nn.Module):
+    def __init__(self, log_input: bool = False, full: bool = False, eps: float = 1e-8):
         super().__init__()
-        self.poisson = nn.PoissonNLLLoss(log_input=log_input, full=full, reduction=reduction)
+        self.poisson = nn.PoissonNLLLoss(log_input=log_input, full=full, eps=eps, reduction="none")
 
     def forward(self, inputs, targets):
-        return self.poisson(inputs, torch.log1p(targets))
+        target_tensors, mice_weights = targets
+        loss_value = 0
+        for mouse_index, (input_tensor, target_tensor) in enumerate(zip(inputs, target_tensors)):
+            mouse_weights = mice_weights[..., mouse_index]
+            mask = mouse_weights != 0.0
+            if torch.any(mask):
+                loss = self.poisson(input_tensor[mask], target_tensor[mask])
+                loss = loss * mouse_weights[mask].unsqueeze(-1).unsqueeze(-1)
+                loss_value += loss.sum()
+        return loss_value
