@@ -183,8 +183,9 @@ class ConcatMiceVideoDataset(Dataset):
             if index == mouse_index:
                 target_tensors.append(target_tensor)
             else:
+                temporal_shape = [target_tensor.shape[-1]] if len(target_tensor.shape) == 2 else []
                 target_tensors.append(
-                    torch.zeros(constants.num_neurons[index], target_tensor.shape[-1], dtype=torch.float32)
+                    torch.zeros(constants.num_neurons[index], *temporal_shape, dtype=torch.float32)
                 )
         mice_weights = torch.zeros(constants.num_mice, dtype=torch.float32)
         mice_weights[mouse_index] = 1.0
