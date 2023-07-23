@@ -4,6 +4,25 @@ import torch
 from torch import nn
 
 
+class GeneralizedMeanPool3d(nn.Module):
+    def __init__(self, norm: float, output_size: int | tuple = 1, eps: float = 1e-6):
+        super(GeneralizedMeanPool3d, self).__init__()
+        assert norm > 0
+        self.p = nn.Parameter(torch.ones(1) * norm)
+        self.output_size = output_size
+        self.eps = eps
+
+    def forward(self, x):
+        x = x.clamp(min=self.eps).pow(self.p)
+        x = torch.nn.functional.adaptive_avg_pool3d(x, self.output_size).pow(1. / self.p)
+        return x
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(' \
+               + str(self.p) + ', ' \
+               + 'output_size=' + str(self.output_size) + ')'
+
+
 class BatchNormAct(nn.Module):
     def __init__(self,
                  num_features: int,
@@ -119,7 +138,7 @@ class UNeuro(nn.Module):
             ]
             prev_num_features = num_features
         self.blocks = nn.Sequential(*blocks)
-        self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
+        self.pool = GeneralizedMeanPool3d(3.0, (None, 1, 1))
 
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
