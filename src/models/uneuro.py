@@ -4,25 +4,6 @@ import torch
 from torch import nn
 
 
-class GeneralizedMeanPool3d(nn.Module):
-    def __init__(self, norm: float, output_size: int | tuple = 1, eps: float = 1e-6):
-        super(GeneralizedMeanPool3d, self).__init__()
-        assert norm > 0
-        self.p = nn.Parameter(torch.ones(1) * norm)
-        self.output_size = output_size
-        self.eps = eps
-
-    def forward(self, x):
-        x = x.clamp(min=self.eps).pow(self.p)
-        x = torch.nn.functional.adaptive_avg_pool3d(x, self.output_size).pow(1. / self.p)
-        return x
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(' \
-               + str(self.p) + ', ' \
-               + 'output_size=' + str(self.output_size) + ')'
-
-
 class BatchNormAct(nn.Module):
     def __init__(self,
                  num_features: int,
@@ -67,7 +48,6 @@ class InvertedResidual3d(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
-                 stride: int = 1,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  act_layer: Type = nn.ReLU,
@@ -82,7 +62,7 @@ class InvertedResidual3d(nn.Module):
 
         # Depth-wise convolution
         self.conv_dw = nn.Conv3d(mid_features, mid_features,
-                                 kernel_size=(3, 3, 3), stride=(1, stride, stride),
+                                 kernel_size=(3, 3, 3), stride=(2, 2, 2),
                                  dilation=(1, 1, 1), padding=(1, 1, 1),
                                  groups=mid_features, bias=bias)
         self.bn2 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
@@ -111,7 +91,7 @@ class UNeuro(nn.Module):
                  in_channels: int = 1,
                  stem_features: int = 32,
                  block_features: tuple[int, ...] = (64, 128, 256, 512),
-                 block_strides: tuple[int, ...] = (2, 2, 2, 2),
+                 decoder_features: tuple[int, ...] = (256, 128, 64, 32),
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  drop_rate: bool = 0.,
@@ -123,29 +103,43 @@ class UNeuro(nn.Module):
                                dilation=(1, 1, 1), padding=(0, 1, 1))
         self.bn1 = BatchNormAct(stem_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer)
 
-        blocks = []
         prev_num_features = stem_features
-        for num_features, stride in zip(block_features, block_strides):
-            blocks += [
+        num_skip_features = []
+        self.blocks = nn.ModuleList()
+        for num_features in block_features:
+            num_skip_features.append(prev_num_features)
+            self.blocks += [
                 InvertedResidual3d(
                     prev_num_features,
                     num_features,
-                    stride=stride,
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
                 )
             ]
             prev_num_features = num_features
-        self.blocks = nn.Sequential(*blocks)
-        self.pool = GeneralizedMeanPool3d(3.0, (None, 1, 1))
 
+        self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
+
+        self.decoder = nn.ModuleList()
+        for num_features, skip_features in zip(decoder_features, num_skip_features[::-1]):
+            self.decoder += [
+                nn.Sequential(
+                    nn.Upsample(scale_factor=2, mode='linear', align_corners=True),
+                    nn.Conv1d(prev_num_features, num_features, (3,), padding=1),
+                    BatchNormAct(num_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+                )
+            ]
+            prev_num_features = num_features + skip_features
+        self.fpn_scales = [2 ** i for i in range(len(self.decoder), 0, -1)]
+
+        in_readout_features = stem_features + sum(block_features) + sum(decoder_features)
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts += [
                 nn.Sequential(
                     nn.Dropout1d(p=drop_rate / 2),
-                    nn.Conv1d(prev_num_features, readout_features, (1,), bias=False),
+                    nn.Conv1d(in_readout_features, readout_features, (1,), bias=False),
                     BatchNormAct(readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
                     nn.Dropout1d(p=drop_rate),
                     nn.Conv1d(readout_features, readout_output, (1,)),
@@ -156,8 +150,22 @@ class UNeuro(nn.Module):
     def forward(self, x: torch.Tensor):
         x = self.conv1(x)  # (4, 32, 16, 32, 32)
         x = self.bn1(x)  # (4, 32, 16, 32, 32)
-        x = self.blocks(x)  # (4, 512, 16, 2, 2)
+
+        skips = []
+        for block in self.blocks:
+            skips.append(self.pool(x).squeeze(-1).squeeze(-1))
+            x = block(x)  # (4, 512, 16, 2, 2)
+
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (4, 512, 16)
+
+        fpn = []
+        for decoder_block, skip, fpn_scale in zip(self.decoder, skips[::-1], self.fpn_scales):
+            fpn.append(nn.functional.interpolate(x, scale_factor=fpn_scale))
+            x = decoder_block(x)
+            x = torch.cat([x, skip], dim=1)
+
+        x = torch.cat(fpn + [x], dim=1)
+
         outputs = []
         for readout in self.readouts:
             y = readout(x)  # (4, 7440, 16)
