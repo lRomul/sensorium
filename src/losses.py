@@ -15,6 +15,6 @@ class MicePoissonLoss(nn.Module):
             mask = mouse_weights != 0.0
             if torch.any(mask):
                 loss = self.poisson(input_tensor[mask], target_tensor[mask])
-                loss = loss * mouse_weights[mask].unsqueeze(-1).unsqueeze(-1)
+                loss *= mouse_weights[mask].view(-1, *[1] * (len(loss.shape) - 1))
                 loss_value += loss.sum()
         return loss_value
