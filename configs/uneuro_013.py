@@ -20,12 +20,13 @@ config = dict(
         "nn_module": ("uneuro", {
             "readout_outputs": constants.num_neurons,
             "in_channels": 5,
-            "stem_features": 32,
-            "block_features": (64, 128, 256, 512),
-            "decoder_features": (256, 128, 64, 32),
+            "stem_features": 64,
+            "block_features": (128, 256, 512, 1024),
+            "block_strides": (2, 2, 2, 2),
             "expansion_ratio": 3,
             "se_reduce_ratio": 32,
             "drop_rate": 0.2,
+            "drop_path_rate": 0.2,
             "readout_features": 2048,
         }),
         "loss": ("mice_poisson", {

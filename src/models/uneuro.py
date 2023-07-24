@@ -48,6 +48,7 @@ class InvertedResidual3d(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
+                 spatial_stride: int = 1,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  act_layer: Type = nn.ReLU,
@@ -61,10 +62,9 @@ class InvertedResidual3d(nn.Module):
         self.bn1 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
 
         # Depth-wise convolution
-        self.conv_dw = nn.Conv3d(mid_features, mid_features,
-                                 kernel_size=(3, 3, 3), stride=(2, 2, 2),
-                                 dilation=(1, 1, 1), padding=(1, 1, 1),
-                                 groups=mid_features, bias=bias)
+        self.conv_dw = nn.Conv3d(mid_features, mid_features, (3, 3, 3),
+                                 stride=(1, spatial_stride, spatial_stride),
+                                 padding=(1, 1, 1), groups=mid_features, bias=bias)
         self.bn2 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
 
         # Squeeze-and-excitation
@@ -85,33 +85,58 @@ class InvertedResidual3d(nn.Module):
         return x
 
 
+def drop_path(x, drop_prob: float = 0., training: bool = False, scale_by_keep: bool = True):
+    if drop_prob == 0. or not training:
+        return x
+    keep_prob = 1 - drop_prob
+    shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+    random_tensor = x.new_empty(shape).bernoulli_(keep_prob)
+    if keep_prob > 0.0 and scale_by_keep:
+        random_tensor.div_(keep_prob)
+    return x * random_tensor
+
+
+class DropPath(nn.Module):
+    def __init__(self, drop_prob: float = 0., scale_by_keep: bool = True):
+        super(DropPath, self).__init__()
+        self.drop_prob = drop_prob
+        self.scale_by_keep = scale_by_keep
+
+    def forward(self, x):
+        return drop_path(x, self.drop_prob, self.training, self.scale_by_keep)
+
+    def extra_repr(self):
+        return f'drop_prob={round(self.drop_prob,3):0.3f}'
+
+
 class UNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
                  in_channels: int = 1,
                  stem_features: int = 32,
                  block_features: tuple[int, ...] = (64, 128, 256, 512),
-                 decoder_features: tuple[int, ...] = (256, 128, 64, 32),
+                 block_strides: tuple[int, ...] = (2, 2, 2, 2),
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 drop_rate: bool = 0.,
+                 drop_rate: float = 0.,
+                 drop_path_rate: float = 0.,
                  readout_features: int = 1024,
                  act_layer: Type = nn.SiLU):
         super().__init__()
-        self.conv1 = nn.Conv3d(in_channels, stem_features,
-                               kernel_size=(1, 3, 3), stride=(1, 2, 2),
-                               dilation=(1, 1, 1), padding=(0, 1, 1))
+        self.conv1 = nn.Conv3d(in_channels, stem_features, (1, 3, 3),
+                               stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
         self.bn1 = BatchNormAct(stem_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer)
 
         prev_num_features = stem_features
         num_skip_features = []
         self.blocks = nn.ModuleList()
-        for num_features in block_features:
+        for num_features, stride in zip(block_features, block_strides):
             num_skip_features.append(prev_num_features)
             self.blocks += [
                 InvertedResidual3d(
                     prev_num_features,
                     num_features,
+                    spatial_stride=stride,
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
@@ -120,20 +145,9 @@ class UNeuro(nn.Module):
             prev_num_features = num_features
 
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
+        self.drop_path = DropPath(drop_path_rate) if drop_path_rate else nn.Identity()
 
-        self.decoder = nn.ModuleList()
-        for num_features, skip_features in zip(decoder_features, num_skip_features[::-1]):
-            self.decoder += [
-                nn.Sequential(
-                    nn.Upsample(scale_factor=2, mode='linear', align_corners=True),
-                    nn.Conv1d(prev_num_features, num_features, (3,), padding=1),
-                    BatchNormAct(num_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-                )
-            ]
-            prev_num_features = num_features + skip_features
-        self.fpn_scales = [2 ** i for i in range(len(self.decoder), 0, -1)]
-
-        in_readout_features = stem_features + sum(block_features) + sum(decoder_features)
+        in_readout_features = stem_features + sum(block_features)
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts += [
@@ -142,7 +156,7 @@ class UNeuro(nn.Module):
                     nn.Conv1d(in_readout_features, readout_features, (1,), bias=False),
                     BatchNormAct(readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
                     nn.Dropout1d(p=drop_rate),
-                    nn.Conv1d(readout_features, readout_output, (1,)),
+                    nn.Conv1d(readout_features, readout_output, (1,), bias=True),
                 )
             ]
         self.gate = nn.Softplus(beta=1, threshold=20)
@@ -153,18 +167,12 @@ class UNeuro(nn.Module):
 
         skips = []
         for block in self.blocks:
-            skips.append(self.pool(x).squeeze(-1).squeeze(-1))
+            skip = self.pool(x).squeeze(-1).squeeze(-1)
+            skips.append(self.drop_path(skip))
             x = block(x)  # (4, 512, 16, 2, 2)
 
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (4, 512, 16)
-
-        fpn = []
-        for decoder_block, skip, fpn_scale in zip(self.decoder, skips[::-1], self.fpn_scales):
-            fpn.append(nn.functional.interpolate(x, scale_factor=fpn_scale))
-            x = decoder_block(x)
-            x = torch.cat([x, skip], dim=1)
-
-        x = torch.cat(fpn + [x], dim=1)
+        x = torch.cat(skips + [x], dim=1)
 
         outputs = []
         for readout in self.readouts:
