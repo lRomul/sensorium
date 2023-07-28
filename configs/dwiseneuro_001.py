@@ -17,7 +17,7 @@ config = dict(
     stages=["warmup", "train"],
     num_dataloader_workers=8,
     argus_params={
-        "nn_module": ("uneuro", {
+        "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
             "in_channels": 5,
             "stem_features": 64,

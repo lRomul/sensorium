@@ -7,13 +7,13 @@ from argus.loss import pytorch_losses
 from argus.utils import deep_to, deep_detach, deep_chunk, Identity
 
 from src.ema import ModelEma
-from src.models.uneuro import UNeuro
 from src.losses import MicePoissonLoss
+from src.models.dwiseneuro import DwiseNeuro
 
 
 class MouseModel(argus.Model):
     nn_module = {
-        "uneuro": UNeuro,
+        "dwiseneuro": DwiseNeuro,
     }
     loss = {
         **pytorch_losses,

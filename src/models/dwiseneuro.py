@@ -44,11 +44,11 @@ class SqueezeExcite3d(nn.Module):
         return x * self.gate(x_se)
 
 
-class InvertedResidual3d(nn.Module):
+class MBConv3dBlock(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
-                 spatial_stride: int = 1,
+                 stride: tuple[int, ...] = (1, 1, 1),
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  act_layer: Type = nn.ReLU,
@@ -62,8 +62,7 @@ class InvertedResidual3d(nn.Module):
         self.bn1 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
 
         # Depth-wise convolution
-        self.conv_dw = nn.Conv3d(mid_features, mid_features, (3, 3, 3),
-                                 stride=(1, spatial_stride, spatial_stride),
+        self.conv_dw = nn.Conv3d(mid_features, mid_features, (3, 3, 3), stride=stride,
                                  padding=(1, 1, 1), groups=mid_features, bias=bias)
         self.bn2 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
 
@@ -109,7 +108,7 @@ class DropPath(nn.Module):
         return f'drop_prob={round(self.drop_prob,3):0.3f}'
 
 
-class UNeuro(nn.Module):
+class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
                  in_channels: int = 1,
@@ -128,15 +127,13 @@ class UNeuro(nn.Module):
         self.bn1 = BatchNormAct(stem_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer)
 
         prev_num_features = stem_features
-        num_skip_features = []
         self.blocks = nn.ModuleList()
         for num_features, stride in zip(block_features, block_strides):
-            num_skip_features.append(prev_num_features)
             self.blocks += [
-                InvertedResidual3d(
+                MBConv3dBlock(
                     prev_num_features,
                     num_features,
-                    spatial_stride=stride,
+                    stride=(1, stride, stride),
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
@@ -147,13 +144,12 @@ class UNeuro(nn.Module):
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
         self.drop_path = DropPath(drop_path_rate) if drop_path_rate else nn.Identity()
 
-        in_readout_features = stem_features + sum(block_features)
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts += [
                 nn.Sequential(
                     nn.Dropout1d(p=drop_rate / 2),
-                    nn.Conv1d(in_readout_features, readout_features, (1,), bias=False),
+                    nn.Conv1d(stem_features + sum(block_features), readout_features, (1,), bias=False),
                     BatchNormAct(readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
                     nn.Dropout1d(p=drop_rate),
                     nn.Conv1d(readout_features, readout_output, (1,), bias=True),
