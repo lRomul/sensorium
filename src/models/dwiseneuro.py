@@ -84,30 +84,6 @@ class MBConv3dBlock(nn.Module):
         return x
 
 
-def drop_path(x, drop_prob: float = 0., training: bool = False, scale_by_keep: bool = True):
-    if drop_prob == 0. or not training:
-        return x
-    keep_prob = 1 - drop_prob
-    shape = (x.shape[0],) + (1,) * (x.ndim - 1)
-    random_tensor = x.new_empty(shape).bernoulli_(keep_prob)
-    if keep_prob > 0.0 and scale_by_keep:
-        random_tensor.div_(keep_prob)
-    return x * random_tensor
-
-
-class DropPath(nn.Module):
-    def __init__(self, drop_prob: float = 0., scale_by_keep: bool = True):
-        super(DropPath, self).__init__()
-        self.drop_prob = drop_prob
-        self.scale_by_keep = scale_by_keep
-
-    def forward(self, x):
-        return drop_path(x, self.drop_prob, self.training, self.scale_by_keep)
-
-    def extra_repr(self):
-        return f'drop_prob={round(self.drop_prob,3):0.3f}'
-
-
 class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
@@ -118,7 +94,6 @@ class DwiseNeuro(nn.Module):
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  drop_rate: float = 0.,
-                 drop_path_rate: float = 0.,
                  readout_features: int = 1024,
                  act_layer: Type = nn.SiLU):
         super().__init__()
@@ -142,14 +117,13 @@ class DwiseNeuro(nn.Module):
             prev_num_features = num_features
 
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
-        self.drop_path = DropPath(drop_path_rate) if drop_path_rate else nn.Identity()
 
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts += [
                 nn.Sequential(
                     nn.Dropout1d(p=drop_rate / 2),
-                    nn.Conv1d(stem_features + sum(block_features), readout_features, (1,), bias=False),
+                    nn.Conv1d(prev_num_features, readout_features, (1,), bias=False),
                     BatchNormAct(readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
                     nn.Dropout1d(p=drop_rate),
                     nn.Conv1d(readout_features, readout_output, (1,), bias=True),
@@ -157,22 +131,16 @@ class DwiseNeuro(nn.Module):
             ]
         self.gate = nn.Softplus(beta=1, threshold=20)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
         x = self.conv1(x)  # (4, 32, 16, 32, 32)
         x = self.bn1(x)  # (4, 32, 16, 32, 32)
 
-        skips = []
         for block in self.blocks:
-            skip = self.pool(x).squeeze(-1).squeeze(-1)
-            skips.append(self.drop_path(skip))
             x = block(x)  # (4, 512, 16, 2, 2)
 
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (4, 512, 16)
-        x = torch.cat(skips + [x], dim=1)
 
-        outputs = []
-        for readout in self.readouts:
-            y = readout(x)  # (4, 7440, 16)
-            y = self.gate(y)  # (4, 7440, 16)
-            outputs.append(y)
-        return outputs
+        if index is None:
+            return [self.gate(readout(x)) for readout in self.readouts]
+        else:
+            return self.gate(self.readouts[index](x))  # (4, 7440, 16)

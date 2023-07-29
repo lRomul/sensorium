@@ -26,7 +26,6 @@ config = dict(
             "expansion_ratio": 3,
             "se_reduce_ratio": 32,
             "drop_rate": 0.2,
-            "drop_path_rate": 0.2,
             "readout_features": 2048,
         }),
         "loss": ("mice_poisson", {
@@ -38,7 +37,6 @@ config = dict(
             "lr": get_lr(base_lr, batch_size),
             "weight_decay": 0.01,
         }),
-        "prediction_transform": "identity",
         "device": "cuda:0",
         "frame_stack": {
             "size": frame_stack_size,

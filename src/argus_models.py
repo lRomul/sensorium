@@ -4,7 +4,7 @@ from torch import nn
 import argus
 from argus.engine import State
 from argus.loss import pytorch_losses
-from argus.utils import deep_to, deep_detach, deep_chunk, Identity
+from argus.utils import deep_to, deep_detach, deep_chunk
 
 from src.ema import ModelEma
 from src.losses import MicePoissonLoss
@@ -18,9 +18,6 @@ class MouseModel(argus.Model):
     loss = {
         **pytorch_losses,
         "mice_poisson": MicePoissonLoss,
-    }
-    prediction_transform = {
-        "identity": Identity,
     }
 
     def __init__(self, params: dict):
