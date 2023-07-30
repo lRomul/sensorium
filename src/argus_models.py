@@ -76,14 +76,14 @@ class MouseModel(argus.Model):
                 'loss': loss.item()
             }
 
-    def predict(self, input):
+    def predict(self, input, mouse_index: int | None = None):
         self._check_predict_ready()
         with torch.no_grad():
             self.eval()
             input = deep_to(input, self.device)
             if self.model_ema is None:
-                prediction = self.nn_module(input)
+                prediction = self.nn_module(input, mouse_index)
             else:
-                prediction = self.model_ema.ema(input)
+                prediction = self.model_ema.ema(input, mouse_index)
             prediction = self.prediction_transform(prediction)
             return prediction
