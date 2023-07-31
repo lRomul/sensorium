@@ -21,7 +21,7 @@ def get_blend_weights(name: str, size: int):
 
 
 class Predictor:
-    def __init__(self, model_path: Path | str, device: str = "cuda:0", blend_weights="linear"):
+    def __init__(self, model_path: Path | str, device: str = "cuda:0", blend_weights="ones"):
         self.model: MouseModel = argus.load_model(model_path, device=device, optimizer=None, loss=None)
         self.model.eval()
         self.inputs_processor = get_inputs_processor(*self.model.params["inputs_processor"])
