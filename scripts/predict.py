@@ -19,28 +19,39 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def predict_trial(trial_data: dict, predictor: Predictor):
+def predict_trial(trial_data: dict, predictor: Predictor, mouse_index: int):
     length = trial_data["length"]
     video = np.load(trial_data["video_path"])[..., :length]
     behavior = np.load(trial_data["behavior_path"])[..., :length]
     pupil_center = np.load(trial_data["pupil_center_path"])[..., :length]
-    responses = predictor.predict_trial(video=video, behavior=behavior, pupil_center=pupil_center)
+    responses = predictor.predict_trial(
+        video=video,
+        behavior=behavior,
+        pupil_center=pupil_center,
+        mouse_index=mouse_index,
+    )
     return responses
 
 
-def predict_mouse(experiment: str, split: str, mouse_index: int, device: str):
+def predict_mouse(experiment: str, split: str, predictor: Predictor, mouse_index: int):
     mouse = constants.index2mouse[mouse_index]
-    print(f"Predict: {experiment=}, {split=}, {mouse_index=}, {mouse=}, {device=}")
+    print(f"Predict mouse: {mouse_index=}, {mouse=}")
     mouse_data = get_mouse_data(mouse=mouse, split=split)
-    model_path = get_best_model_path(constants.experiments_dir / experiment / f"mouse_{mouse_index}")
-    print("Model path:", model_path)
-    predictor = Predictor(model_path=model_path, device=device)
     mouse_prediction_dir = constants.predictions_dir / experiment / split / f"mouse_{mouse_index}"
     mouse_prediction_dir.mkdir(parents=True, exist_ok=True)
 
     for trial_data in tqdm(mouse_data["trials"]):
-        responses = predict_trial(trial_data, predictor)
+        responses = predict_trial(trial_data, predictor, mouse_index)
         np.save(str(mouse_prediction_dir / f"{trial_data['trial_id']}.npy"), responses)
+
+
+def predict_mice(experiment: str, split: str, device: str):
+    model_path = get_best_model_path(constants.experiments_dir / experiment)
+    print(f"Predict mice: {experiment=}, {split=}, {model_path=}")
+    predictor = Predictor(model_path=model_path, device=device, blend_weights="linear")
+
+    for mouse_index in mice_indexes:
+        predict_mouse(experiment, split, predictor, mouse_index)
 
 
 def make_submission(experiment: str, split: str):
@@ -76,7 +87,5 @@ if __name__ == "__main__":
     else:
         mice_indexes = [int(index) for index in args.mice.split(",")]
 
-    for mouse_index in mice_indexes:
-        predict_mouse(args.experiment, args.split, mouse_index, args.device)
-
+    predict_mice(args.experiment, args.split, args.device)
     make_submission(args.experiment, args.split)
