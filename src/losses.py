@@ -17,4 +17,4 @@ class MicePoissonLoss(nn.Module):
                 loss = self.poisson(input_tensor[mask], target_tensor[mask])
                 loss *= mouse_weights[mask].view(-1, *[1] * (len(loss.shape) - 1))
                 loss_value += loss.sum()
-        return loss_value
+        return loss_value / inputs[0].shape[0]
