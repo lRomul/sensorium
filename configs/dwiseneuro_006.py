@@ -20,13 +20,13 @@ config = dict(
         "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
             "in_channels": 5,
-            "stem_features": 64,
-            "block_features": (128, 256, 512, 1024),
+            "stem_features": 32,
+            "block_features": (64, 128, 256, 512),
             "block_strides": (2, 2, 2, 2),
             "expansion_ratio": 3,
-            "se_reduce_ratio": 32,
-            "drop_rate": 0.2,
-            "readout_features": 2048,
+            "se_reduce_ratio": 16,
+            "drop_rate": 0.0,
+            "readout_features": 1024,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
@@ -35,7 +35,7 @@ config = dict(
         }),
         "optimizer": ("AdamW", {
             "lr": get_lr(base_lr, batch_size),
-            "weight_decay": 0.1,
+            "weight_decay": 0.05,
         }),
         "device": "cuda:0",
         "frame_stack": {
