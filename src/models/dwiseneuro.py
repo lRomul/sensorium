@@ -102,9 +102,9 @@ class DwiseNeuro(nn.Module):
         self.bn1 = BatchNormAct(stem_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer)
 
         prev_num_features = stem_features
-        self.blocks = nn.ModuleList()
+        blocks = []
         for num_features, stride in zip(block_features, block_strides):
-            self.blocks += [
+            blocks += [
                 MBConv3dBlock(
                     prev_num_features,
                     num_features,
@@ -115,6 +115,7 @@ class DwiseNeuro(nn.Module):
                 )
             ]
             prev_num_features = num_features
+        self.blocks = nn.Sequential(*blocks)
 
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
@@ -132,15 +133,12 @@ class DwiseNeuro(nn.Module):
         self.gate = nn.Softplus(beta=1, threshold=20)
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
-        x = self.conv1(x)  # (4, 32, 16, 32, 32)
-        x = self.bn1(x)  # (4, 32, 16, 32, 32)
-
-        for block in self.blocks:
-            x = block(x)  # (4, 512, 16, 2, 2)
-
-        x = self.pool(x).squeeze(-1).squeeze(-1)  # (4, 512, 16)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.blocks(x)
+        x = self.pool(x).squeeze(-1).squeeze(-1)
 
         if index is None:
             return [self.gate(readout(x)) for readout in self.readouts]
         else:
-            return self.gate(self.readouts[index](x))  # (4, 7440, 16)
+            return self.gate(self.readouts[index](x))
