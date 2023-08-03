@@ -123,14 +123,26 @@ class DwiseNeuro(nn.Module):
         for readout_output in readout_outputs:
             self.readouts += [
                 nn.Sequential(
-                    nn.Dropout1d(p=drop_rate / 2),
+                    nn.Dropout1d(p=drop_rate / 2) if drop_rate else nn.Identity(),
                     nn.Conv1d(prev_num_features, readout_features, (1,), bias=False),
                     BatchNormAct(readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-                    nn.Dropout1d(p=drop_rate),
+                    nn.Dropout1d(p=drop_rate) if drop_rate else nn.Identity(),
                     nn.Conv1d(readout_features, readout_output, (1,), bias=True),
                 )
             ]
         self.gate = nn.Softplus(beta=1, threshold=20)
+
+        self._init_weights()
+
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, (nn.Conv1d, nn.Conv3d)):
+                nn.init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm3d)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.zeros_(m.bias)
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
         x = self.conv1(x)
