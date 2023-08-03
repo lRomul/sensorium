@@ -132,18 +132,6 @@ class DwiseNeuro(nn.Module):
             ]
         self.gate = nn.Softplus(beta=1, threshold=20)
 
-        self._init_weights()
-
-    def _init_weights(self):
-        for m in self.modules():
-            if isinstance(m, (nn.Conv1d, nn.Conv3d)):
-                nn.init.kaiming_normal_(m.weight)
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
-            elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm3d)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.zeros_(m.bias)
-
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
         x = self.conv1(x)
         x = self.bn1(x)

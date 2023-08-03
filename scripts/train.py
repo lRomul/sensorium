@@ -20,9 +20,9 @@ from src.responses import get_responses_processor
 from src.indexes import StackIndexesGenerator
 from src.ema import ModelEma, EmaCheckpoint
 from src.inputs import get_inputs_processor
+from src.utils import get_lr, init_weights
 from src.metrics import CorrelationMetric
 from src.argus_models import MouseModel
-from src.utils import get_lr
 from src.mixup import Mixup
 from src import constants
 
@@ -39,9 +39,9 @@ def train_mouse(config: dict, save_dir: Path):
 
     model = MouseModel(argus_params)
 
-    nn_module_params = model.params["nn_module"][1]
-    if "pretrained" in model.params["nn_module"][1]:
-        nn_module_params["pretrained"] = False
+    if config["init_weights"]:
+        print("Weight initialization")
+        init_weights(model.nn_module)
 
     if config["ema_decay"]:
         print("EMA decay:", config["ema_decay"])

@@ -1,9 +1,12 @@
 import re
+import math
 import time
 import random
 from pathlib import Path
 
 import numpy as np
+
+from torch import nn
 
 
 def set_random_seed(index: int):
@@ -38,3 +41,22 @@ def get_best_model_path(dir_path, return_score=False, more_better=True):
         return best_model_path, best_score
     else:
         return best_model_path
+
+
+def init_weights(module: nn.Module):
+    for m in module.modules():
+        if isinstance(m, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+            fan_out = math.prod(m.kernel_size) * m.out_channels
+            fan_out //= m.groups
+            nn.init.normal_(m.weight, 0, math.sqrt(2.0 / fan_out))
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+        elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+            nn.init.ones_(m.weight)
+            nn.init.zeros_(m.bias)
+        elif isinstance(m, nn.Linear):
+            fan_out = m.weight.size(0)
+            fan_in = 0
+            init_range = 1.0 / math.sqrt(fan_in + fan_out)
+            nn.init.uniform_(m.weight, -init_range, init_range)
+            nn.init.zeros_(m.bias)

@@ -16,6 +16,7 @@ config = dict(
     num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=8,
+    init_weights=True,
     argus_params={
         "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
@@ -35,7 +36,7 @@ config = dict(
         }),
         "optimizer": ("AdamW", {
             "lr": get_lr(base_lr, batch_size),
-            "weight_decay": 0.1,
+            "weight_decay": 0.05,
         }),
         "device": "cuda:0",
         "frame_stack": {
