@@ -35,7 +35,7 @@ config = dict(
         }),
         "optimizer": ("AdamW", {
             "lr": get_lr(base_lr, batch_size),
-            "weight_decay": 0.05,
+            "weight_decay": 0.1,
         }),
         "device": "cuda:0",
         "frame_stack": {
