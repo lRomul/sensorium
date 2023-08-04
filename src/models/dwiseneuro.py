@@ -1,3 +1,4 @@
+import math
 from typing import Type
 
 import torch
@@ -44,6 +45,51 @@ class SqueezeExcite3d(nn.Module):
         return x * self.gate(x_se)
 
 
+class PositionalEncoding3D(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.orig_channels = channels
+        channels = math.ceil(channels / 6) * 2
+        if channels % 2:
+            channels += 1
+        self.channels = channels
+        inv_freq = 1.0 / (10000 ** (torch.arange(0, channels, 2).float() / channels))
+        self.register_buffer("inv_freq", inv_freq)
+        self.register_buffer("cached_encoding", None)
+
+    def get_emb(self, sin_inp):
+        emb = torch.stack((sin_inp.sin(), sin_inp.cos()), dim=0)
+        return torch.flatten(emb, 0, 1)
+
+    def create_cached_encoding(self, tensor):
+        _, orig_ch, x, y, z = tensor.shape
+        assert orig_ch == self.orig_channels
+        self.cached_encoding = None
+        pos_x = torch.arange(x, device=tensor.device).type(self.inv_freq.type())
+        pos_y = torch.arange(y, device=tensor.device).type(self.inv_freq.type())
+        pos_z = torch.arange(z, device=tensor.device).type(self.inv_freq.type())
+        sin_inp_x = torch.einsum("i,j->ij", self.inv_freq, pos_x)
+        sin_inp_y = torch.einsum("i,j->ij", self.inv_freq, pos_y)
+        sin_inp_z = torch.einsum("i,j->ij", self.inv_freq, pos_z)
+        emb_x = self.get_emb(sin_inp_x).unsqueeze(-1).unsqueeze(-1)
+        emb_y = self.get_emb(sin_inp_y).unsqueeze(1).unsqueeze(-1)
+        emb_z = self.get_emb(sin_inp_z).unsqueeze(1).unsqueeze(1)
+        emb = torch.zeros((self.channels * 3, x, y, z), dtype=tensor.dtype, device=tensor.device)
+        emb[:self.channels] = emb_x
+        emb[self.channels: 2 * self.channels] = emb_y
+        emb[2 * self.channels:] = emb_z
+        self.cached_encoding = emb[None, :self.orig_channels].contiguous()
+
+    def forward(self, tensor):
+        if len(tensor.shape) != 5:
+            raise RuntimeError("The input tensor has to be 5D")
+
+        if self.cached_encoding is None or self.cached_encoding.shape[1:] != tensor.shape[1:]:
+            self.create_cached_encoding(tensor)
+
+        return self.cached_encoding.expand(tensor.shape[0], -1, -1, -1, -1)
+
+
 class MBConv3dBlock(nn.Module):
     def __init__(self,
                  in_features: int,
@@ -62,6 +108,7 @@ class MBConv3dBlock(nn.Module):
         self.bn1 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
 
         # Depth-wise convolution
+        self.pos_enc = PositionalEncoding3D(mid_features)
         self.conv_dw = nn.Conv3d(mid_features, mid_features, (3, 3, 3), stride=stride,
                                  padding=(1, 1, 1), groups=mid_features, bias=bias)
         self.bn2 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
@@ -76,6 +123,7 @@ class MBConv3dBlock(nn.Module):
     def forward(self, x):
         x = self.conv_pw(x)
         x = self.bn1(x)
+        x = x + self.pos_enc(x)
         x = self.conv_dw(x)
         x = self.bn2(x)
         x = self.se(x)
