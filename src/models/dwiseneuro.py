@@ -80,14 +80,14 @@ class PositionalEncoding3D(nn.Module):
         emb[2 * self.channels:] = emb_z
         self.cached_encoding = emb[None, :self.orig_channels].contiguous()
 
-    def forward(self, tensor):
-        if len(tensor.shape) != 5:
+    def forward(self, x):
+        if len(x.shape) != 5:
             raise RuntimeError("The input tensor has to be 5D")
 
-        if self.cached_encoding is None or self.cached_encoding.shape[1:] != tensor.shape[1:]:
-            self.create_cached_encoding(tensor)
+        if self.cached_encoding is None or self.cached_encoding.shape[1:] != x.shape[1:]:
+            self.create_cached_encoding(x)
 
-        return self.cached_encoding.expand(tensor.shape[0], -1, -1, -1, -1)
+        return x + self.cached_encoding.expand(*x.shape)
 
 
 class MBConv3dBlock(nn.Module):
@@ -108,7 +108,6 @@ class MBConv3dBlock(nn.Module):
         self.bn1 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
 
         # Depth-wise convolution
-        self.pos_enc = PositionalEncoding3D(mid_features)
         self.conv_dw = nn.Conv3d(mid_features, mid_features, (3, 3, 3), stride=stride,
                                  padding=(1, 1, 1), groups=mid_features, bias=bias)
         self.bn2 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
@@ -123,7 +122,6 @@ class MBConv3dBlock(nn.Module):
     def forward(self, x):
         x = self.conv_pw(x)
         x = self.bn1(x)
-        x = x + self.pos_enc(x)
         x = self.conv_dw(x)
         x = self.bn2(x)
         x = self.se(x)
@@ -153,6 +151,7 @@ class DwiseNeuro(nn.Module):
         blocks = []
         for num_features, stride in zip(block_features, block_strides):
             blocks += [
+                PositionalEncoding3D(prev_num_features),
                 MBConv3dBlock(
                     prev_num_features,
                     num_features,
