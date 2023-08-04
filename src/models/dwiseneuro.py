@@ -55,7 +55,7 @@ class PositionalEncoding3D(nn.Module):
         self.channels = channels
         inv_freq = 1.0 / (10000 ** (torch.arange(0, channels, 2).float() / channels))
         self.register_buffer("inv_freq", inv_freq)
-        self.register_buffer("cached_encoding", None)
+        self.register_buffer("cached_encoding", None, persistent=False)
 
     def get_emb(self, sin_inp):
         emb = torch.stack((sin_inp.sin(), sin_inp.cos()), dim=0)
