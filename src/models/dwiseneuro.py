@@ -78,16 +78,19 @@ class PositionalEncoding3D(nn.Module):
         emb[:self.channels] = emb_x
         emb[self.channels: 2 * self.channels] = emb_y
         emb[2 * self.channels:] = emb_z
-        self.cached_encoding = emb[None, :self.orig_channels].contiguous()
+        emb = emb[None, :self.orig_channels].contiguous()
+        self.cached_encoding = emb
+        return emb
 
     def forward(self, x):
         if len(x.shape) != 5:
             raise RuntimeError("The input tensor has to be 5D")
 
-        if self.cached_encoding is None or self.cached_encoding.shape[1:] != x.shape[1:]:
-            self.create_cached_encoding(x)
+        cached_encoding = self.cached_encoding
+        if cached_encoding is None or cached_encoding.shape[1:] != x.shape[1:]:
+            cached_encoding = self.create_cached_encoding(x)
 
-        return x + self.cached_encoding.expand(*x.shape)
+        return x + cached_encoding.expand_as(x)
 
 
 class MBConv3dBlock(nn.Module):
