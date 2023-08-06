@@ -1,5 +1,6 @@
 import math
-from typing import Type
+import functools
+from typing import Callable
 
 import torch
 from torch import nn
@@ -8,15 +9,12 @@ from torch import nn
 class BatchNormAct(nn.Module):
     def __init__(self,
                  num_features: int,
-                 bn_layer: Type = nn.BatchNorm3d,
-                 act_layer: Type = nn.ReLU,
+                 bn_layer: Callable = nn.BatchNorm3d,
+                 act_layer: Callable = nn.ReLU,
                  apply_act: bool = True):
         super().__init__()
         self.bn = bn_layer(num_features)
-        if apply_act:
-            self.act = act_layer(inplace=True)
-        else:
-            self.act = nn.Identity()
+        self.act = act_layer() if apply_act else nn.Identity()
 
     def forward(self, x):
         x = self.bn(x)
@@ -28,12 +26,12 @@ class SqueezeExcite3d(nn.Module):
     def __init__(self,
                  in_features: int,
                  reduce_ratio: int = 16,
-                 act_layer: Type = nn.ReLU,
-                 gate_layer: Type = nn.Sigmoid):
+                 act_layer: Callable = nn.ReLU,
+                 gate_layer: Callable = nn.Sigmoid):
         super().__init__()
         rd_channels = in_features // reduce_ratio
         self.conv_reduce = nn.Conv3d(in_features, rd_channels, (1, 1, 1), bias=True)
-        self.act1 = act_layer(inplace=True)
+        self.act1 = act_layer()
         self.conv_expand = nn.Conv3d(rd_channels, in_features, (1, 1, 1), bias=True)
         self.gate = gate_layer()
 
@@ -43,6 +41,46 @@ class SqueezeExcite3d(nn.Module):
         x_se = self.act1(x_se)
         x_se = self.conv_expand(x_se)
         return x * self.gate(x_se)
+
+
+class MBConv3dBlock(nn.Module):
+    def __init__(self,
+                 in_features: int,
+                 out_features: int,
+                 stride: tuple[int, ...] = (1, 1, 1),
+                 expansion_ratio: int = 3,
+                 se_reduce_ratio: int = 16,
+                 act_layer: Callable = nn.ReLU,
+                 bias: bool = False):
+        super().__init__()
+        mid_features = in_features * expansion_ratio
+        bn_layer = nn.BatchNorm3d
+
+        # Point-wise expansion
+        self.conv_pw = nn.Conv3d(in_features, mid_features, (1, 1, 1), bias=bias)
+        self.bn1 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
+
+        # Depth-wise convolution
+        self.conv_dw = nn.Conv3d(mid_features, mid_features, (3, 3, 3), stride=stride,
+                                 padding=(1, 1, 1), groups=mid_features, bias=bias)
+        self.bn2 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
+
+        # Squeeze-and-excitation
+        self.se = SqueezeExcite3d(mid_features, act_layer=act_layer, reduce_ratio=se_reduce_ratio)
+
+        # Point-wise linear projection
+        self.conv_pwl = nn.Conv3d(mid_features, out_features, (1, 1, 1), bias=bias)
+        self.bn3 = BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False)
+
+    def forward(self, x):
+        x = self.conv_pw(x)
+        x = self.bn1(x)
+        x = self.conv_dw(x)
+        x = self.bn2(x)
+        x = self.se(x)
+        x = self.conv_pwl(x)
+        x = self.bn3(x)
+        return x
 
 
 class PositionalEncoding3D(nn.Module):
@@ -93,46 +131,6 @@ class PositionalEncoding3D(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
-class MBConv3dBlock(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 out_features: int,
-                 stride: tuple[int, ...] = (1, 1, 1),
-                 expansion_ratio: int = 3,
-                 se_reduce_ratio: int = 16,
-                 act_layer: Type = nn.ReLU,
-                 bias: bool = False):
-        super().__init__()
-        mid_features = in_features * expansion_ratio
-        bn_layer = nn.BatchNorm3d
-
-        # Point-wise expansion
-        self.conv_pw = nn.Conv3d(in_features, mid_features, (1, 1, 1), bias=bias)
-        self.bn1 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
-
-        # Depth-wise convolution
-        self.conv_dw = nn.Conv3d(mid_features, mid_features, (3, 3, 3), stride=stride,
-                                 padding=(1, 1, 1), groups=mid_features, bias=bias)
-        self.bn2 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
-
-        # Squeeze-and-excitation
-        self.se = SqueezeExcite3d(mid_features, act_layer=act_layer, reduce_ratio=se_reduce_ratio)
-
-        # Point-wise linear projection
-        self.conv_pwl = nn.Conv3d(mid_features, out_features, (1, 1, 1), bias=bias)
-        self.bn3 = BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False)
-
-    def forward(self, x):
-        x = self.conv_pw(x)
-        x = self.bn1(x)
-        x = self.conv_dw(x)
-        x = self.bn2(x)
-        x = self.se(x)
-        x = self.conv_pwl(x)
-        x = self.bn3(x)
-        return x
-
-
 class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
@@ -143,9 +141,9 @@ class DwiseNeuro(nn.Module):
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  drop_rate: float = 0.,
-                 readout_features: int = 1024,
-                 act_layer: Type = nn.SiLU):
+                 readout_features: int = 1024):
         super().__init__()
+        act_layer = functools.partial(nn.SiLU, inplace=True)
         self.conv1 = nn.Conv3d(in_channels, stem_features, (1, 3, 3),
                                stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
         self.bn1 = BatchNormAct(stem_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer)
@@ -178,9 +176,9 @@ class DwiseNeuro(nn.Module):
                     BatchNormAct(readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
                     nn.Dropout1d(p=drop_rate) if drop_rate else nn.Identity(),
                     nn.Conv1d(readout_features, readout_output, (1,), bias=True),
+                    nn.Softplus(beta=1, threshold=20),
                 )
             ]
-        self.gate = nn.Softplus(beta=1, threshold=20)
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
         x = self.conv1(x)
@@ -189,6 +187,6 @@ class DwiseNeuro(nn.Module):
         x = self.pool(x).squeeze(-1).squeeze(-1)
 
         if index is None:
-            return [self.gate(readout(x)) for readout in self.readouts]
+            return [readout(x) for readout in self.readouts]
         else:
-            return self.gate(self.readouts[index](x))
+            return self.readouts[index](x)
