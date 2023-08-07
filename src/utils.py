@@ -59,4 +59,5 @@ def init_weights(module: nn.Module):
             fan_in = 0
             init_range = 1.0 / math.sqrt(fan_in + fan_out)
             nn.init.uniform_(m.weight, -init_range, init_range)
-            nn.init.zeros_(m.bias)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)

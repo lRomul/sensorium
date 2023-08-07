@@ -131,6 +131,46 @@ class PositionalEncoding3D(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
+class Readout(nn.Module):
+    def __init__(self,
+                 in_features: int,
+                 hidden_features: int,
+                 out_features: int,
+                 groups: int = 1,
+                 act_layer: Callable = nn.ReLU,
+                 dropout: float = 0.0):
+        super().__init__()
+        self.out_features = out_features
+        self.groups = groups
+        self.layer1 = nn.Sequential(
+            nn.Dropout1d(p=dropout / 2) if dropout else nn.Identity(),
+            nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
+            BatchNormAct(hidden_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+        )
+        self.layer2 = nn.Sequential(
+            nn.Dropout1d(p=dropout) if dropout else nn.Identity(),
+            nn.Conv1d(hidden_features,
+                      math.ceil(out_features / groups) * groups, (1,),
+                      groups=groups, bias=True),
+        )
+        self.gate = nn.Softplus()
+
+    def forward(self, x):
+        x = self.layer1(x)
+
+        if self.groups > 1:
+            # Shuffle channels between groups
+            b, c, t = x.shape
+            x = x.view(b, -1, self.groups, t)
+            x = torch.transpose(x, 1, 2)
+            x = x.reshape(b, -1, t)
+
+        x = self.layer2(x)
+        x = x[:, :self.out_features]
+        x = self.gate(x)
+        return x
+
+
 class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
@@ -140,8 +180,9 @@ class DwiseNeuro(nn.Module):
                  block_strides: tuple[int, ...] = (2, 2, 2, 2),
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 drop_rate: float = 0.,
-                 readout_features: int = 1024):
+                 readout_features: int = 4096,
+                 readout_groups: int = 4,
+                 dropout: float = 0.):
         super().__init__()
         act_layer = functools.partial(nn.SiLU, inplace=True)
         self.conv1 = nn.Conv3d(in_channels, stem_features, (1, 3, 3),
@@ -170,14 +211,8 @@ class DwiseNeuro(nn.Module):
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts += [
-                nn.Sequential(
-                    nn.Dropout1d(p=drop_rate / 2) if drop_rate else nn.Identity(),
-                    nn.Conv1d(prev_num_features, readout_features, (1,), bias=False),
-                    BatchNormAct(readout_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-                    nn.Dropout1d(p=drop_rate) if drop_rate else nn.Identity(),
-                    nn.Conv1d(readout_features, readout_output, (1,), bias=True),
-                    nn.Softplus(beta=1, threshold=20),
-                )
+                Readout(prev_num_features, readout_features, readout_output,
+                        groups=readout_groups, act_layer=act_layer, dropout=dropout)
             ]
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
