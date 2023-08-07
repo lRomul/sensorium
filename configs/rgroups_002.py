@@ -27,7 +27,7 @@ config = dict(
             "expansion_ratio": 3,
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
-            "readout_groups": 4,
+            "readout_groups": 8,
             "dropout": 0.2,
         }),
         "loss": ("mice_poisson", {
