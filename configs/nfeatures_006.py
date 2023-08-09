@@ -28,7 +28,7 @@ config = dict(
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
             "readout_groups": 4,
-            "dropout": 0.0,
+            "dropout": 0.1,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
