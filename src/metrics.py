@@ -2,7 +2,6 @@ from collections import defaultdict
 from typing import Union, Tuple
 
 import numpy as np
-from numpy.typing import ArrayLike
 
 import torch
 
@@ -10,7 +9,7 @@ from argus.metrics import Metric
 
 
 def corr(
-    y1: ArrayLike, y2: ArrayLike, axis: Union[None, int, Tuple[int]] = -1, eps: int = 1e-8, **kwargs
+    y1: np.ndarray, y2: np.ndarray, axis: Union[None, int, Tuple[int]] = -1, eps: float = 1e-8, **kwargs
 ) -> np.ndarray:
     """
     Compute the correlation between two NumPy arrays along the specified dimension(s).

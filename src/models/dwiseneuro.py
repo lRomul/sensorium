@@ -47,7 +47,7 @@ class MBConv3dBlock(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
-                 stride: tuple[int, ...] = (1, 1, 1),
+                 stride: tuple[int, int, int] = (1, 1, 1),
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  act_layer: Callable = nn.ReLU,
