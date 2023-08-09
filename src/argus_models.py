@@ -7,8 +7,8 @@ from argus.loss import pytorch_losses
 from argus.utils import deep_to, deep_detach, deep_chunk
 
 from src.ema import ModelEma
-from src.losses import MicePoissonLoss
 from src.models.dwiseneuro import DwiseNeuro
+from src.losses import MicePoissonLoss, MiceCorrelationLoss
 
 
 class MouseModel(argus.Model):
@@ -18,6 +18,7 @@ class MouseModel(argus.Model):
     loss = {
         **pytorch_losses,
         "mice_poisson": MicePoissonLoss,
+        "mice_correlation": MiceCorrelationLoss,
     }
 
     def __init__(self, params: dict):
