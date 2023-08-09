@@ -24,11 +24,11 @@ config = dict(
             "stem_features": 512,
             "block_features": (512, 512, 512, 512),
             "block_strides": (2, 2, 2, 2),
-            "expansion_ratio": 2,
+            "expansion_ratio": 3,
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
             "readout_groups": 4,
-            "dropout": 0.2,
+            "dropout": 0.4,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
