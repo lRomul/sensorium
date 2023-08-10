@@ -25,7 +25,7 @@ class MiceLoss(nn.Module, metaclass=abc.ABCMeta):
                     mouse_weights[mask],
                 )
                 loss_value += loss
-        return loss_value / outputs[0].shape[0]
+        return loss_value
 
 
 class MicePoissonLoss(MiceLoss):
@@ -64,10 +64,10 @@ class MiceCorrelationLoss(MiceLoss):
         delta_output = output - output.mean(0, keepdim=True)
         delta_target = target - target.mean(0, keepdim=True)
 
-        var_out = delta_output.pow(2).mean(0, keepdim=True)
+        var_output = delta_output.pow(2).mean(0, keepdim=True)
         var_target = delta_target.pow(2).mean(0, keepdim=True)
 
         correlations = (delta_output * delta_target).mean(0, keepdim=True) / (
-            (var_out + self.eps) * (var_target + self.eps)
+            (var_output + self.eps) * (var_target + self.eps)
         ).sqrt()
         return -correlations.sum()
