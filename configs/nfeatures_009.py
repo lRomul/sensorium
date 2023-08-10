@@ -50,7 +50,7 @@ config = dict(
             "pad_fill_value": 0.,
         }),
         "responses_processor": ("identity", {}),
-        "amp": True,
+        "amp": False,
         "iter_size": 1,
     },
     mixup={
