@@ -30,9 +30,7 @@ config = dict(
             "readout_groups": 4,
             "dropout": 0.2,
         }),
-        "loss": ("mice_poisson", {
-            "log_input": False,
-            "full": False,
+        "loss": ("mice_correlation", {
             "eps": 1e-8,
         }),
         "optimizer": ("AdamW", {
