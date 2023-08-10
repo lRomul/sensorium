@@ -11,15 +11,15 @@ from src.mixup import Mixup
 from src.data import get_mouse_data
 from src.utils import set_random_seed
 from src.inputs import InputsProcessor
+from src.indexes import IndexesGenerator
 from src.responses import ResponsesProcessor
-from src.indexes import StackIndexesGenerator
 from src import constants
 
 
 class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
     def __init__(self,
                  mouse: str, split: str,
-                 indexes_generator: StackIndexesGenerator,
+                 indexes_generator: IndexesGenerator,
                  inputs_processor: InputsProcessor,
                  responses_processor: ResponsesProcessor):
         self.mouse = mouse
@@ -34,34 +34,34 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
         self.trials_lengths = [t["length"] for t in self.trials]
         self.num_neurons = self.mouse_data["num_neurons"]
 
-    def get_frames(self, trial_index: int, frame_indexes: list[int]) -> np.ndarray:
-        frames = np.load(self.trials[trial_index]["video_path"])[..., frame_indexes]
+    def get_frames(self, trial_index: int, indexes: list[int]) -> np.ndarray:
+        frames = np.load(self.trials[trial_index]["video_path"])[..., indexes]
         return frames
 
-    def get_responses(self, trial_index: int, frame_indexes: list[int]) -> np.ndarray:
-        responses = np.load(self.trials[trial_index]["response_path"])[..., frame_indexes]
+    def get_responses(self, trial_index: int, indexes: list[int]) -> np.ndarray:
+        responses = np.load(self.trials[trial_index]["response_path"])[..., indexes]
         return responses
 
-    def get_behavior(self, trial_index: int, frame_indexes: list[int]) -> np.ndarray:
-        behavior = np.load(self.trials[trial_index]["behavior_path"])[..., frame_indexes]
+    def get_behavior(self, trial_index: int, indexes: list[int]) -> np.ndarray:
+        behavior = np.load(self.trials[trial_index]["behavior_path"])[..., indexes]
         return behavior
 
-    def get_pupil_center(self, trial_index: int, frame_indexes: list[int]) -> np.ndarray:
-        pupil_center = np.load(self.trials[trial_index]["pupil_center_path"])[..., frame_indexes]
+    def get_pupil_center(self, trial_index: int, indexes: list[int]) -> np.ndarray:
+        pupil_center = np.load(self.trials[trial_index]["pupil_center_path"])[..., indexes]
         return pupil_center
 
-    def get_frames_responses(
+    def get_inputs_responses(
             self,
             trial_index: int,
-            frame_indexes: list[int],
+            indexes: list[int],
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        frames = self.get_frames(trial_index, frame_indexes)
-        responses = self.get_responses(trial_index, frame_indexes)
-        behavior = self.get_behavior(trial_index, frame_indexes)
-        pupil_center = self.get_pupil_center(trial_index, frame_indexes)
+        frames = self.get_frames(trial_index, indexes)
+        responses = self.get_responses(trial_index, indexes)
+        behavior = self.get_behavior(trial_index, indexes)
+        pupil_center = self.get_pupil_center(trial_index, indexes)
         return frames, behavior, pupil_center, responses
 
-    def process_frames_responses(self,
+    def process_inputs_responses(self,
                                  frames: np.ndarray,
                                  behavior: np.ndarray,
                                  pupil_center: np.ndarray,
@@ -75,13 +75,13 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_frame_indexes(self, index: int) -> tuple[int, list[int]]:
+    def get_indexes(self, index: int) -> tuple[int, list[int]]:
         pass
 
     def get_sample_tensors(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        trial_index, frame_indexes = self.get_frame_indexes(index)
-        frames, behavior, pupil_center, responses = self.get_frames_responses(trial_index, frame_indexes)
-        return self.process_frames_responses(frames, behavior, pupil_center, responses)
+        trial_index, indexes = self.get_indexes(index)
+        frames, behavior, pupil_center, responses = self.get_inputs_responses(trial_index, indexes)
+        return self.process_inputs_responses(frames, behavior, pupil_center, responses)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         return self.get_sample_tensors(index)
@@ -90,7 +90,7 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
 class TrainMouseVideoDataset(MouseVideoDataset):
     def __init__(self,
                  mouse: str,
-                 indexes_generator: StackIndexesGenerator,
+                 indexes_generator: IndexesGenerator,
                  inputs_processor: InputsProcessor,
                  responses_processor: ResponsesProcessor,
                  epoch_size: int,
@@ -104,7 +104,7 @@ class TrainMouseVideoDataset(MouseVideoDataset):
     def __len__(self) -> int:
         return self.epoch_size
 
-    def get_frame_indexes(self, index: int) -> tuple[int, list[int]]:
+    def get_indexes(self, index: int) -> tuple[int, list[int]]:
         set_random_seed(index)
         trial_index = random.randrange(0, self.num_trials)
         num_frames = self.trials[trial_index]["length"]
@@ -112,8 +112,8 @@ class TrainMouseVideoDataset(MouseVideoDataset):
             self.indexes_generator.behind,
             num_frames - self.indexes_generator.ahead
         )
-        frame_indexes = self.indexes_generator.make_stack_indexes(frame_index)
-        return trial_index, frame_indexes
+        indexes = self.indexes_generator.make_indexes(frame_index)
+        return trial_index, indexes
 
     def get_sample_tensors(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         frames, responses = super().get_sample_tensors(index)
@@ -132,18 +132,18 @@ class TrainMouseVideoDataset(MouseVideoDataset):
 class ValMouseVideoDataset(MouseVideoDataset):
     def __init__(self,
                  mouse: str,
-                 indexes_generator: StackIndexesGenerator,
+                 indexes_generator: IndexesGenerator,
                  inputs_processor: InputsProcessor,
                  responses_processor: ResponsesProcessor):
         super().__init__(mouse, "val", indexes_generator, inputs_processor, responses_processor)
-        self.window_size = self.indexes_generator.ahead + self.indexes_generator.behind + 1
+        self.window_size = self.indexes_generator.width
         self.samples_per_trials = [length // self.window_size for length in self.trials_lengths]
         self.num_samples = sum(self.samples_per_trials)
 
     def __len__(self) -> int:
         return self.num_samples
 
-    def get_frame_indexes(self, index: int) -> tuple[int, list[int]]:
+    def get_indexes(self, index: int) -> tuple[int, list[int]]:
         assert 0 <= index < self.__len__()
         trial_sample_index = index
         trial_index = 0
@@ -154,8 +154,8 @@ class ValMouseVideoDataset(MouseVideoDataset):
                 break
 
         frame_index = self.indexes_generator.behind + trial_sample_index * self.window_size
-        frame_indexes = self.indexes_generator.make_stack_indexes(frame_index)
-        return trial_index, frame_indexes
+        indexes = self.indexes_generator.make_indexes(frame_index)
+        return trial_index, indexes
 
 
 class ConcatMiceVideoDataset(Dataset):

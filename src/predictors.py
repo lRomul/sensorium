@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import argus
 
-from src.indexes import StackIndexesGenerator
+from src.indexes import IndexesGenerator
 from src.inputs import get_inputs_processor
 from src.argus_models import MouseModel
 from src import constants
@@ -29,8 +29,8 @@ class Predictor:
         self.frame_stack_step = self.model.params["frame_stack"]["step"]
         assert self.model.params["frame_stack"]["position"] == "last"
         assert self.model.params["responses_processor"][0] == "identity"
-        self.indexes_generator = StackIndexesGenerator(self.frame_stack_size,
-                                                       self.frame_stack_step)
+        self.indexes_generator = IndexesGenerator(self.frame_stack_size,
+                                                  self.frame_stack_step)
         self.blend_weights = get_blend_weights(blend_weights, self.frame_stack_size)
 
     @torch.no_grad()
@@ -47,7 +47,7 @@ class Predictor:
             self.indexes_generator.behind,
             length - self.indexes_generator.ahead
         ):
-            indexes = self.indexes_generator.make_stack_indexes(index)
+            indexes = self.indexes_generator.make_indexes(index)
             prediction = self.model.predict(inputs[:, indexes].unsqueeze(0), mouse_index)[0]
             responses[..., indexes] += prediction.cpu().numpy()
             blend_weights[indexes] += self.blend_weights

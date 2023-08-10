@@ -17,11 +17,11 @@ from argus.callbacks import (
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset, ConcatMiceVideoDataset
 from src.responses import get_responses_processor
-from src.indexes import StackIndexesGenerator
 from src.ema import ModelEma, EmaCheckpoint
 from src.inputs import get_inputs_processor
 from src.utils import get_lr, init_weights
 from src.metrics import CorrelationMetric
+from src.indexes import IndexesGenerator
 from src.argus_models import MouseModel
 from src.mixup import Mixup
 from src import constants
@@ -50,7 +50,7 @@ def train_mouse(config: dict, save_dir: Path):
     else:
         checkpoint_class = Checkpoint
 
-    indexes_generator = StackIndexesGenerator(**argus_params["frame_stack"])
+    indexes_generator = IndexesGenerator(**argus_params["frame_stack"])
     inputs_processor = get_inputs_processor(*argus_params["inputs_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
 
@@ -91,7 +91,7 @@ def train_mouse(config: dict, save_dir: Path):
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=int(config["batch_size"] * 2),
+        batch_size=config["batch_size"],
         num_workers=config["num_dataloader_workers"],
         shuffle=False,
     )
