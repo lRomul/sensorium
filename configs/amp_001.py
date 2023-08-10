@@ -24,7 +24,7 @@ config = dict(
             "stem_features": 256,
             "block_features": (256, 256, 256, 256),
             "block_strides": (2, 2, 2, 2),
-            "expansion_ratio": 4,
+            "expansion_ratio": 6,
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
             "readout_groups": 4,
@@ -50,7 +50,7 @@ config = dict(
             "pad_fill_value": 0.,
         }),
         "responses_processor": ("identity", {}),
-        "amp": False,
+        "amp": True,
         "iter_size": 1,
     },
     mixup={
