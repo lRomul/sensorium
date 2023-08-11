@@ -35,7 +35,7 @@ config = dict(
                 ("poisson", {"log_input": False, "full": False, "eps": 1e-8}),
                 ("correlation", {"eps": 1e-8}),
             ],
-            "multipliers": [0.01, 1.0],
+            "multipliers": [0.003, 1.0],
         }),
         "optimizer": ("AdamW", {
             "lr": get_lr(base_lr, batch_size),
