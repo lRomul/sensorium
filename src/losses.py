@@ -29,6 +29,20 @@ class AbstractMiceLoss(nn.Module, metaclass=abc.ABCMeta):
         return loss_value
 
 
+class MSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mse = nn.MSELoss(reduction="none")
+
+    def forward(self,
+                output: torch.Tensor,
+                target: torch.Tensor,
+                weights: torch.Tensor) -> torch.Tensor:
+        loss = self.mse(output, target)
+        loss *= weights.view(-1, *[1] * (len(loss.shape) - 1))
+        return loss.sum()
+
+
 class PoissonLoss(nn.Module):
     def __init__(self, log_input: bool = False, full: bool = False, eps: float = 1e-8):
         super().__init__()
@@ -77,6 +91,7 @@ class CorrelationLoss(nn.Module):
 _LOSS_REGISTRY: dict[str, Type[nn.Module]] = dict(
     poisson=PoissonLoss,
     correlation=CorrelationLoss,
+    mse=MSELoss,
 )
 
 

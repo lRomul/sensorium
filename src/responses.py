@@ -7,7 +7,7 @@ import torch
 
 
 def responses_to_tensor(responses: np.ndarray) -> torch.Tensor:
-    responses_tensor = torch.from_numpy(responses)
+    responses_tensor = torch.from_numpy(responses.astype(np.float32))
     responses_tensor = torch.relu(responses_tensor)
     return responses_tensor
 
