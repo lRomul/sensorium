@@ -68,7 +68,8 @@ def train_mouse(config: dict, save_dir: Path):
                 mixup=mixup,
             )
         ]
-    train_dataset = ConcatMiceVideoDataset(train_datasets)
+    batch_size = config["batch_size"]
+    train_dataset = ConcatMiceVideoDataset(train_datasets, batch_size)
     print("Train dataset len:", len(train_dataset))
     val_datasets = []
     for mouse in constants.mice:
@@ -80,18 +81,18 @@ def train_mouse(config: dict, save_dir: Path):
                 responses_processor=responses_processor,
             )
         ]
-    val_dataset = ConcatMiceVideoDataset(val_datasets)
+    val_dataset = ConcatMiceVideoDataset(val_datasets, batch_size)
     print("Val dataset len:", len(val_dataset))
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config["batch_size"],
+        batch_size=batch_size,
         num_workers=config["num_dataloader_workers"],
         shuffle=True,
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=config["batch_size"],
+        batch_size=batch_size,
         num_workers=config["num_dataloader_workers"],
         shuffle=False,
     )

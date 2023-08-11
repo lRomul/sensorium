@@ -66,11 +66,6 @@ class CorrelationLoss(nn.Module):
                 output: torch.Tensor,
                 target: torch.Tensor,
                 weights: torch.Tensor) -> torch.Tensor:
-        if torch.any(weights != 1.0):
-            weights = weights.view(-1, *[1] * (len(output.shape) - 1))
-            output = output * weights
-            target = target * weights
-
         output = torch.transpose(output, 1, 2)
         output = output.reshape(-1, output.shape[-1])
         target = torch.transpose(target, 1, 2)

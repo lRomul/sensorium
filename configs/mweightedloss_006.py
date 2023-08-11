@@ -30,9 +30,12 @@ config = dict(
             "readout_groups": 4,
             "dropout": 0.2,
         }),
-        "loss": ("single_mice", {
-            "name": "mse",
-            "params": {},
+        "loss": ("multi_weighted_mice", {
+            "losses_params": [
+                ("poisson", {"log_input": False, "full": False, "eps": 1e-8}),
+                ("correlation", {"eps": 1e-8}),
+            ],
+            "multipliers": [3e-7, 1.0],
         }),
         "optimizer": ("AdamW", {
             "lr": get_lr(base_lr, batch_size),

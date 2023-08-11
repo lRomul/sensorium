@@ -159,9 +159,10 @@ class ValMouseVideoDataset(MouseVideoDataset):
 
 
 class ConcatMiceVideoDataset(Dataset):
-    def __init__(self, mice_datasets: list[MouseVideoDataset]):
+    def __init__(self, mice_datasets: list[MouseVideoDataset], batch_size: int):
         assert [d.mouse_index for d in mice_datasets] == constants.mice_indexes
         self.mice_datasets = mice_datasets
+        self.batch_size = batch_size
         self.samples_per_dataset = [len(d) for d in mice_datasets]
         self.num_samples = sum(self.samples_per_dataset)
 
@@ -188,5 +189,5 @@ class ConcatMiceVideoDataset(Dataset):
                     torch.zeros(constants.num_neurons[index], *temporal_shape, dtype=torch.float32)
                 )
         mice_weights = torch.zeros(constants.num_mice, dtype=torch.float32)
-        mice_weights[mouse_index] = 1.0
+        mice_weights[mouse_index] = 1.0 / self.batch_size
         return input_tensor, (target_tensors, mice_weights)
