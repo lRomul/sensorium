@@ -1,10 +1,11 @@
 import abc
+from typing import Type
 
 import torch
 from torch import nn
 
 
-class MiceLoss(nn.Module, metaclass=abc.ABCMeta):
+class AbstractMiceLoss(nn.Module, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def compute_mouse_loss(self,
                            output: torch.Tensor,
@@ -12,7 +13,7 @@ class MiceLoss(nn.Module, metaclass=abc.ABCMeta):
                            weights: torch.Tensor) -> torch.Tensor:
         pass
 
-    def forward(self, outputs, targets):
+    def forward(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         target_tensors, mice_weights = targets
         loss_value = 0
         for mouse_index, (output_tensor, target_tensor) in enumerate(zip(outputs, target_tensors)):
@@ -28,29 +29,29 @@ class MiceLoss(nn.Module, metaclass=abc.ABCMeta):
         return loss_value
 
 
-class MicePoissonLoss(MiceLoss):
+class PoissonLoss(nn.Module):
     def __init__(self, log_input: bool = False, full: bool = False, eps: float = 1e-8):
         super().__init__()
         self.poisson = nn.PoissonNLLLoss(log_input=log_input, full=full, eps=eps, reduction="none")
 
-    def compute_mouse_loss(self,
-                           output: torch.Tensor,
-                           target: torch.Tensor,
-                           weights: torch.Tensor) -> torch.Tensor:
+    def forward(self,
+                output: torch.Tensor,
+                target: torch.Tensor,
+                weights: torch.Tensor) -> torch.Tensor:
         loss = self.poisson(output, target)
         loss *= weights.view(-1, *[1] * (len(loss.shape) - 1))
         return loss.sum()
 
 
-class MiceCorrelationLoss(MiceLoss):
+class CorrelationLoss(nn.Module):
     def __init__(self, eps=1e-8):
         super().__init__()
         self.eps = eps
 
-    def compute_mouse_loss(self,
-                           output: torch.Tensor,
-                           target: torch.Tensor,
-                           weights: torch.Tensor) -> torch.Tensor:
+    def forward(self,
+                output: torch.Tensor,
+                target: torch.Tensor,
+                weights: torch.Tensor) -> torch.Tensor:
         if torch.any(weights != 1.0):
             weights = weights.view(-1, *[1] * (len(output.shape) - 1))
             output = output * weights
@@ -71,3 +72,44 @@ class MiceCorrelationLoss(MiceLoss):
             (var_output + self.eps) * (var_target + self.eps)
         ).sqrt()
         return -correlations.sum()
+
+
+_LOSS_REGISTRY: dict[str, Type[nn.Module]] = dict(
+    poisson=PoissonLoss,
+    correlation=CorrelationLoss,
+)
+
+
+def get_loss(name: str, loss_params: dict) -> nn.Module:
+    assert name in _LOSS_REGISTRY
+    return _LOSS_REGISTRY[name](**loss_params)
+
+
+class SingleMiceLoss(AbstractMiceLoss):
+    def __init__(self, name: str, params: dict):
+        super().__init__()
+        self.loss = get_loss(name, params)
+
+    def compute_mouse_loss(self,
+                           output: torch.Tensor,
+                           target: torch.Tensor,
+                           weights: torch.Tensor) -> torch.Tensor:
+        return self.loss(output, target, weights)
+
+
+class MultiWeightedMiceLoss(AbstractMiceLoss):
+    def __init__(self,
+                 losses_params: list[tuple[str, dict]],
+                 multipliers: list[int]):
+        super(AbstractMiceLoss, self).__init__()
+        self.losses = [get_loss(*loss_params) for loss_params in losses_params]
+        self.multipliers = multipliers
+
+    def compute_mouse_loss(self,
+                           output: torch.Tensor,
+                           target: torch.Tensor,
+                           weights: torch.Tensor) -> torch.Tensor:
+        loss_value = 0
+        for loss, multiplier in zip(self.losses, self.multipliers):
+            loss_value += multiplier * loss(output, target, weights)
+        return loss_value
