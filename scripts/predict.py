@@ -16,7 +16,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--experiment", required=True, type=str)
     parser.add_argument("-s", "--split", required=True, type=str)
-    parser.add_argument("-d", "--device", default="cuda:0", type=str)
+    parser.add_argument("-d", "--dataset", default="new", type=str)
+    parser.add_argument("--device", default="cuda:0", type=str)
     return parser.parse_args()
 
 
@@ -34,8 +35,8 @@ def predict_trial(trial_data: dict, predictor: Predictor, mouse_index: int):
     return responses
 
 
-def predict_mouse(experiment: str, split: str, predictor: Predictor, mouse_index: int):
-    mouse = constants.index2mouse[mouse_index]
+def predict_mouse(experiment: str, split: str, predictor: Predictor, mouse: str):
+    mouse_index = constants.mouse2index[mouse]
     print(f"Predict mouse: {mouse_index=}, {mouse=}")
     mouse_data = get_mouse_data(mouse=mouse, split=split)
     mouse_prediction_dir = constants.predictions_dir / experiment / split / f"mouse_{mouse_index}"
@@ -46,13 +47,13 @@ def predict_mouse(experiment: str, split: str, predictor: Predictor, mouse_index
         np.save(str(mouse_prediction_dir / f"{trial_data['trial_id']}.npy"), responses)
 
 
-def predict_mice(experiment: str, split: str, device: str):
+def predict_mice(experiment: str, split: str, dataset: str, device: str):
     model_path = get_best_model_path(constants.experiments_dir / experiment)
     print(f"Predict mice: {experiment=}, {split=}, {model_path=}")
     predictor = Predictor(model_path=model_path, device=device, blend_weights="ones")
 
-    for mouse_index in constants.mice_indexes:
-        predict_mouse(experiment, split, predictor, mouse_index)
+    for mouse in constants.dataset2mice[dataset]:
+        predict_mouse(experiment, split, predictor, mouse)
 
 
 def cut_responses(prediction: np.ndarray):
@@ -62,11 +63,11 @@ def cut_responses(prediction: np.ndarray):
     return prediction
 
 
-def evaluate_predictions(experiment: str, split: str):
+def evaluate_predictions(experiment: str, split: str, dataset: str):
     prediction_dir = constants.predictions_dir / experiment / split
     correlations = dict()
-    for mouse_index in constants.mice_indexes:
-        mouse = constants.index2mouse[mouse_index]
+    for mouse in constants.dataset2mice[dataset]:
+        mouse_index = constants.mouse2index[mouse]
         mouse_data = get_mouse_data(mouse=mouse, split=split)
         mouse_prediction_dir = prediction_dir / f"mouse_{mouse_index}"
         predictions = []
@@ -89,15 +90,15 @@ def evaluate_predictions(experiment: str, split: str):
     print("Mean correlation:", mean_correlation)
 
     evaluate_result = {"correlations": correlations, "mean_correlation": mean_correlation}
-    with open(prediction_dir / "evaluate.json", "w") as outfile:
+    with open(prediction_dir / f"evaluate_{dataset}.json", "w") as outfile:
         json.dump(evaluate_result, outfile, indent=4)
 
 
 def make_submission(experiment: str, split: str):
     prediction_dir = constants.predictions_dir / experiment / split
     data = []
-    for mouse_index in constants.mice_indexes:
-        mouse = constants.index2mouse[mouse_index]
+    for mouse in constants.new_mice:
+        mouse_index = constants.mouse2index[mouse]
         mouse_data = get_mouse_data(mouse=mouse, split=split)
         neuron_ids = mouse_data["neuron_ids"].tolist()
         mouse_prediction_dir = prediction_dir / f"mouse_{mouse_index}"
@@ -118,9 +119,9 @@ def make_submission(experiment: str, split: str):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    predict_mice(args.experiment, args.split, args.device)
+    predict_mice(args.experiment, args.split, args.dataset, args.device)
 
     if args.split in constants.labeled_splits:
-        evaluate_predictions(args.experiment, args.split)
-    else:
+        evaluate_predictions(args.experiment, args.split, args.dataset)
+    elif args.dataset == "new":
         make_submission(args.experiment, args.split)
