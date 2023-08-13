@@ -9,6 +9,7 @@ class MicePoissonLoss(nn.Module):
 
     def forward(self, inputs, targets):
         target_tensors, mice_weights = targets
+        mice_weights = mice_weights / mice_weights.shape[0]
         loss_value = 0
         for mouse_index, (input_tensor, target_tensor) in enumerate(zip(inputs, target_tensors)):
             mouse_weights = mice_weights[..., mouse_index]
@@ -17,4 +18,4 @@ class MicePoissonLoss(nn.Module):
                 loss = self.poisson(input_tensor[mask], target_tensor[mask])
                 loss *= mouse_weights[mask].view(-1, *[1] * (len(loss.shape) - 1))
                 loss_value += loss.sum()
-        return loss_value / inputs[0].shape[0]
+        return loss_value
