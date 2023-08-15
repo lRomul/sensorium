@@ -26,7 +26,7 @@ config = dict(
             "block_strides": (2, 2, 2, 2),
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
-            "readout_features": 1024 * 8,
+            "readout_features": 1024 * 4,
             "readout_groups": 4,
             "dropout": 0.2,
         }),
