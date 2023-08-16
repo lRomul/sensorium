@@ -161,7 +161,7 @@ class Readout(nn.Module):
         if self.groups > 1:
             # Shuffle channels between groups
             b, c, t = x.shape
-            x = x.view(b, self.groups, -1, t)
+            x = x.view(b, -1, self.groups, t)
             x = torch.transpose(x, 1, 2)
             x = x.reshape(b, -1, t)
 
