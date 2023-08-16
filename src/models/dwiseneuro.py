@@ -43,7 +43,31 @@ class SqueezeExcite3d(nn.Module):
         return x * self.gate(x_se)
 
 
-class MBConv3dBlock(nn.Module):
+def drop_path(x, drop_prob: float = 0., training: bool = False, scale_by_keep: bool = True):
+    if drop_prob == 0. or not training:
+        return x
+    keep_prob = 1 - drop_prob
+    shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+    random_tensor = x.new_empty(shape).bernoulli_(keep_prob)
+    if keep_prob > 0. and scale_by_keep:
+        random_tensor.div_(keep_prob)
+    return x * random_tensor
+
+
+class DropPath(nn.Module):
+    def __init__(self, drop_prob: float = 0., scale_by_keep: bool = True):
+        super(DropPath, self).__init__()
+        self.drop_prob = drop_prob
+        self.scale_by_keep = scale_by_keep
+
+    def forward(self, x):
+        return drop_path(x, self.drop_prob, self.training, self.scale_by_keep)
+
+    def extra_repr(self):
+        return f'drop_prob={round(self.drop_prob,3):0.3f}'
+
+
+class InvertedResidual3d(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
@@ -51,6 +75,7 @@ class MBConv3dBlock(nn.Module):
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  act_layer: Callable = nn.ReLU,
+                 drop_path_rate: float = 0.,
                  bias: bool = False):
         super().__init__()
         mid_features = in_features * expansion_ratio
@@ -72,7 +97,15 @@ class MBConv3dBlock(nn.Module):
         self.conv_pwl = nn.Conv3d(mid_features, out_features, (1, 1, 1), bias=bias)
         self.bn3 = BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False)
 
+        # Projection shortcut
+        self.drop_path = DropPath(drop_prob=drop_path_rate)
+        self.proj_sc = nn.Sequential(
+            nn.Conv3d(in_features, out_features, kernel_size=(1, 1, 1), stride=stride, bias=bias),
+            BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False),
+        )
+
     def forward(self, x):
+        shortcut = x
         x = self.conv_pw(x)
         x = self.bn1(x)
         x = self.conv_dw(x)
@@ -80,6 +113,7 @@ class MBConv3dBlock(nn.Module):
         x = self.se(x)
         x = self.conv_pwl(x)
         x = self.bn3(x)
+        x = self.drop_path(x) + self.proj_sc(shortcut)
         return x
 
 
@@ -138,17 +172,17 @@ class Readout(nn.Module):
                  out_features: int,
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
-                 dropout: float = 0.0):
+                 drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
         self.groups = groups
         self.layer1 = nn.Sequential(
-            nn.Dropout1d(p=dropout / 2) if dropout else nn.Identity(),
+            nn.Dropout1d(p=drop_rate / 2.),
             nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
             BatchNormAct(hidden_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
         )
         self.layer2 = nn.Sequential(
-            nn.Dropout1d(p=dropout) if dropout else nn.Identity(),
+            nn.Dropout1d(p=drop_rate),
             nn.Conv1d(hidden_features,
                       math.ceil(out_features / groups) * groups, (1,),
                       groups=groups, bias=True),
@@ -182,7 +216,8 @@ class DwiseNeuro(nn.Module):
                  se_reduce_ratio: int = 16,
                  readout_features: int = 4096,
                  readout_groups: int = 4,
-                 dropout: float = 0.):
+                 drop_rate: float = 0.,
+                 drop_path_rate: float = 0.):
         super().__init__()
         act_layer = functools.partial(nn.SiLU, inplace=True)
         self.conv1 = nn.Conv3d(in_channels, stem_features, (1, 3, 3),
@@ -194,13 +229,15 @@ class DwiseNeuro(nn.Module):
         for num_features, stride in zip(block_features, block_strides):
             blocks += [
                 PositionalEncoding3D(prev_num_features),
-                MBConv3dBlock(
+                InvertedResidual3d(
                     prev_num_features,
                     num_features,
                     stride=(1, stride, stride),
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
+                    drop_path_rate=drop_path_rate,
+                    bias=False,
                 )
             ]
             prev_num_features = num_features
@@ -212,7 +249,7 @@ class DwiseNeuro(nn.Module):
         for readout_output in readout_outputs:
             self.readouts += [
                 Readout(prev_num_features, readout_features, readout_output,
-                        groups=readout_groups, act_layer=act_layer, dropout=dropout)
+                        groups=readout_groups, act_layer=act_layer, drop_rate=drop_rate)
             ]
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
