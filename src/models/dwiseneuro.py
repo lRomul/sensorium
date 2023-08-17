@@ -100,7 +100,8 @@ class InvertedResidual3d(nn.Module):
         # Projection shortcut
         self.drop_path = DropPath(drop_prob=drop_path_rate)
         self.proj_sc = nn.Sequential(
-            nn.Conv3d(in_features, out_features, kernel_size=(1, 1, 1), stride=stride, bias=bias),
+            nn.Conv3d(in_features, out_features, kernel_size=(1, 1, 1), stride=stride,
+                      groups=math.gcd(in_features, out_features), bias=bias),
             BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False),
         )
 
@@ -226,7 +227,8 @@ class DwiseNeuro(nn.Module):
 
         prev_num_features = stem_features
         blocks = []
-        for num_features, stride in zip(block_features, block_strides):
+        for block_index, (num_features, stride) in enumerate(zip(block_features, block_strides)):
+            block_drop_path_rate = drop_path_rate * block_index / len(block_features)
             blocks += [
                 PositionalEncoding3D(prev_num_features),
                 InvertedResidual3d(
@@ -236,7 +238,7 @@ class DwiseNeuro(nn.Module):
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
-                    drop_path_rate=drop_path_rate,
+                    drop_path_rate=block_drop_path_rate,
                     bias=False,
                 )
             ]
