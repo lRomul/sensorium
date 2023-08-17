@@ -29,7 +29,7 @@ config = dict(
             "readout_features": 1024 * 8,
             "readout_groups": 4,
             "drop_rate": 0.2,
-            "drop_path_rate": 0.0,
+            "drop_path_rate": 0.25,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
