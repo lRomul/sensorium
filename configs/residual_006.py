@@ -21,8 +21,8 @@ config = dict(
         "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
             "in_channels": 5,
-            "stem_features": 128,
-            "block_features": (128, 128, 128, 128),
+            "stem_features": 256,
+            "block_features": (256, 256, 256, 256),
             "block_strides": (2, 2, 2, 2),
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
