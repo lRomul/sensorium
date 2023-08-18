@@ -25,7 +25,7 @@ config = dict(
             "block_features": (128, 128,
                                128, 128,
                                128, 128,
-                               128, 128),
+                               256, 256),
             "block_strides": (2, 1,
                               2, 1,
                               2, 1,
@@ -35,7 +35,7 @@ config = dict(
             "readout_features": 1024 * 8,
             "readout_groups": 4,
             "drop_rate": 0.2,
-            "drop_path_rate": 0.0,
+            "drop_path_rate": 0.2,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
@@ -57,7 +57,7 @@ config = dict(
             "pad_fill_value": 0.,
         }),
         "responses_processor": ("identity", {}),
-        "amp": True,
+        "amp": False,
         "iter_size": 1,
     },
     mixup={
