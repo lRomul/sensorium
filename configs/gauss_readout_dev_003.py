@@ -33,6 +33,7 @@ config = dict(
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
             "drop_path_rate": 0.2,
+            "drop_rate": 0.2,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,

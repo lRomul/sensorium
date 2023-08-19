@@ -177,9 +177,11 @@ class DwiseNeuro(nn.Module):
                  block_strides: tuple[int, ...] = (2, 2, 2, 2),
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 drop_path_rate: float = 0.):
+                 drop_path_rate: float = 0.,
+                 drop_rate: float = 0.):
         super().__init__()
         self.readout_outputs = readout_outputs
+        self.drop_rate = drop_rate
 
         act_layer = functools.partial(nn.SiLU, inplace=True)
         self.conv1 = nn.Conv3d(in_channels, stem_features, (1, 3, 3),
@@ -246,6 +248,8 @@ class DwiseNeuro(nn.Module):
                 y = x[mask]
                 b, t, c, h, w = y.shape
                 y = y.reshape(b * t, c, h, w)
+                if self.drop_rate > 0.:
+                    y = nn.functional.dropout2d(y, p=self.drop_rate, training=self.training)
                 y = readout(y)
                 y = y.reshape(b, t, -1).transpose(1, 2)
                 output[mask] = self.gate(y)
