@@ -253,14 +253,27 @@ class DwiseNeuro(nn.Module):
                 Readout(prev_num_features, readout_features, readout_output,
                         groups=readout_groups, act_layer=act_layer, drop_rate=drop_rate)
             ]
+        self.num_readouts = len(self.readouts)
 
-    def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
+    def forward_features(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.blocks(x)
         x = self.pool(x).squeeze(-1).squeeze(-1)
+        return x
 
-        if index is None:
-            return [readout(x) for readout in self.readouts]
+    def forward_readout(self, x: torch.Tensor, readout_index: int, weights: torch.Tensor | None = None):
+        readout = self.readouts[readout_index]
+        if weights is None:
+            return readout(x)
         else:
-            return self.readouts[index](x)
+            output = torch.zeros(x.shape[0], readout.out_features, x.shape[2], device=x.device)
+            mask = weights != 0.0
+            if torch.any(mask):
+                output[mask] = readout(x[mask])
+            return output
+
+    def forward(self, x: torch.Tensor, weights: torch.Tensor | None = None) -> list[torch.Tensor]:
+        x = self.forward_features(x)
+        x = [self.forward_readout(x, i, weights=weights[..., i]) for i in range(self.num_readouts)]
+        return x

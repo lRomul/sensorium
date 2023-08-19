@@ -39,7 +39,7 @@ class MouseModel(argus.Model):
                 if self.augmentations is not None:
                     input = self.augmentations(input)
             with torch.cuda.amp.autocast(enabled=self.amp):
-                prediction = self.nn_module(input)
+                prediction = self.nn_module(input, weights=target[1])
                 loss = self.loss(prediction, target)
                 loss = loss / self.iter_size
             self.grad_scaler.scale(loss).backward()
@@ -65,9 +65,9 @@ class MouseModel(argus.Model):
         with torch.no_grad():
             input, target = deep_to(batch, device=self.device, non_blocking=True)
             if self.model_ema is None:
-                prediction = self.nn_module(input)
+                prediction = self.nn_module(input, weights=target[1])
             else:
-                prediction = self.model_ema.ema(input)
+                prediction = self.model_ema.ema(input, weights=target[1])
             loss = self.loss(prediction, target)
             prediction = self.prediction_transform(prediction)
             return {
@@ -76,14 +76,16 @@ class MouseModel(argus.Model):
                 'loss': loss.item()
             }
 
-    def predict(self, input, mouse_index: int | None = None):
+    def predict(self, input, mouse_index: int):
         self._check_predict_ready()
         with torch.no_grad():
             self.eval()
             input = deep_to(input, self.device)
             if self.model_ema is None:
-                prediction = self.nn_module(input, mouse_index)
+                nn_module = self.nn_module
             else:
-                prediction = self.model_ema.ema(input, mouse_index)
+                nn_module = self.nn_module.ema
+            features = nn_module.forward_features(input)
+            prediction = nn_module.forward_readout(features, mouse_index)
             prediction = self.prediction_transform(prediction)
             return prediction
