@@ -25,6 +25,7 @@ def get_mouse_data(mouse: str, split: str):
     trial_ids = np.argwhere(trials == ("oracle" if split == "val" else split)).ravel().tolist()
     neuron_ids = np.load(str(mouse_dir / "meta" / "neurons" / "unit_ids.npy"))
     cell_motor_coords = np.load(str(mouse_dir / "meta" / "neurons" / "cell_motor_coordinates.npy"))
+    responses_mean = np.load(str(mouse_dir / "meta" / "statistics" / "responses" / "all" / "mean.npy"))
 
     mouse_data = {
         "mouse": mouse,
@@ -34,6 +35,7 @@ def get_mouse_data(mouse: str, split: str):
         "neuron_ids": neuron_ids,
         "num_neurons": neuron_ids.shape[0],
         "cell_motor_coordinates": cell_motor_coords,
+        "mean_activity": np.nanmean(responses_mean, axis=-1),
         "trials": [],
     }
 

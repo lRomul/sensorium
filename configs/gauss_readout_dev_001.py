@@ -12,7 +12,7 @@ config = dict(
     base_lr=base_lr,
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
-    train_epoch_size=45000,
+    train_epoch_size=18000,
     num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=8,
@@ -32,9 +32,6 @@ config = dict(
                               2, 1),
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
-            "readout_features": 1024 * 8,
-            "readout_groups": 4,
-            "drop_rate": 0.2,
             "drop_path_rate": 0.2,
         }),
         "loss": ("mice_poisson", {

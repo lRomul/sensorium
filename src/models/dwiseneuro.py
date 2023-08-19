@@ -5,6 +5,8 @@ from typing import Callable
 import torch
 from torch import nn
 
+from neuralpredictors.layers.readouts import FullGaussian2d
+
 
 class BatchNormAct(nn.Module):
     def __init__(self,
@@ -166,46 +168,6 @@ class PositionalEncoding3D(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
-class Readout(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 hidden_features: int,
-                 out_features: int,
-                 groups: int = 1,
-                 act_layer: Callable = nn.ReLU,
-                 drop_rate: float = 0.):
-        super().__init__()
-        self.out_features = out_features
-        self.groups = groups
-        self.layer1 = nn.Sequential(
-            nn.Dropout1d(p=drop_rate / 2.),
-            nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
-            BatchNormAct(hidden_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-        )
-        self.layer2 = nn.Sequential(
-            nn.Dropout1d(p=drop_rate),
-            nn.Conv1d(hidden_features,
-                      math.ceil(out_features / groups) * groups, (1,),
-                      groups=groups, bias=True),
-        )
-        self.gate = nn.Softplus()
-
-    def forward(self, x):
-        x = self.layer1(x)
-
-        if self.groups > 1:
-            # Shuffle channels between groups
-            b, c, t = x.shape
-            x = x.view(b, -1, self.groups, t)
-            x = torch.transpose(x, 1, 2)
-            x = x.reshape(b, -1, t)
-
-        x = self.layer2(x)
-        x = x[:, :self.out_features]
-        x = self.gate(x)
-        return x
-
-
 class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
@@ -215,11 +177,10 @@ class DwiseNeuro(nn.Module):
                  block_strides: tuple[int, ...] = (2, 2, 2, 2),
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 readout_features: int = 4096,
-                 readout_groups: int = 4,
-                 drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
+        self.readout_outputs = readout_outputs
+
         act_layer = functools.partial(nn.SiLU, inplace=True)
         self.conv1 = nn.Conv3d(in_channels, stem_features, (1, 3, 3),
                                stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
@@ -245,22 +206,48 @@ class DwiseNeuro(nn.Module):
             prev_num_features = num_features
         self.blocks = nn.Sequential(*blocks)
 
-        self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
-
         self.readouts = nn.ModuleList()
-        for readout_output in readout_outputs:
+        for index, readout_output in enumerate(readout_outputs):
+            from src.data import get_mouse_data
+            from src.constants import index2mouse
+            mouse_data = get_mouse_data(mouse=index2mouse[index], split="val")
             self.readouts += [
-                Readout(prev_num_features, readout_features, readout_output,
-                        groups=readout_groups, act_layer=act_layer, drop_rate=drop_rate)
+                FullGaussian2d(
+                    in_shape=(prev_num_features, 2, 2),
+                    outdims=readout_output,
+                    bias=True,
+                    init_mu_range=0.1,
+                    init_sigma=1,
+                    batch_sample=True,
+                    align_corners=True,
+                    gauss_type="full",
+                    grid_mean_predictor={
+                        'hidden_layers': 1,
+                        'hidden_features': 20,
+                        'final_tanh': False,
+                    },
+                    source_grid=mouse_data['cell_motor_coordinates'],
+                    mean_activity=torch.from_numpy(mouse_data['mean_activity']),
+                )
             ]
+        self.gate = nn.Softplus()
 
-    def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
+    def forward(self, x: torch.Tensor, weights: torch.Tensor) -> list[torch.Tensor] | torch.Tensor:
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.blocks(x)
-        x = self.pool(x).squeeze(-1).squeeze(-1)
+        x = x.transpose(1, 2)
 
-        if index is None:
-            return [readout(x) for readout in self.readouts]
-        else:
-            return self.readouts[index](x)
+        outputs = []
+        for index, (readout, output_dim) in enumerate(zip(self.readouts, self.readout_outputs)):
+            output = torch.zeros(x.shape[0], output_dim, x.shape[1], device=x.device)
+            mask = weights[..., index] != 0.0
+            if torch.any(mask):
+                y = x[mask]
+                b, t, c, h, w = y.shape
+                y = y.reshape(b * t, c, h, w)
+                y = readout(y)
+                y = y.reshape(b, t, -1).transpose(1, 2)
+                output[mask] = self.gate(y)
+            outputs.append(output)
+        return outputs
