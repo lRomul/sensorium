@@ -34,6 +34,7 @@ config = dict(
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
             "readout_groups": 4,
+            "behaviour_kernel": 7,
             "drop_rate": 0.2,
             "drop_path_rate": 0.2,
         }),
