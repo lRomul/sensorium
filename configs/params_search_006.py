@@ -24,8 +24,10 @@ config = dict(
             "stem_features": 128,
             "block_features": (128, 128,
                                128, 128,
+                               128, 128,
                                256, 256),
             "block_strides": (2, 1,
+                              2, 1,
                               2, 1,
                               2, 1),
             "expansion_ratio": 6,
@@ -60,6 +62,6 @@ config = dict(
     },
     mixup={
         "alpha": 0.4,
-        "prob": 0.5,
+        "prob": 1.0,
     },
 )
