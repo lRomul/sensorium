@@ -210,7 +210,6 @@ class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
                  in_channels: int = 1,
-                 stem_features: int = 32,
                  block_features: tuple[int, ...] = (64, 128, 256, 512),
                  block_strides: tuple[int, ...] = (2, 2, 2, 2),
                  expansion_ratio: int = 3,
@@ -221,19 +220,26 @@ class DwiseNeuro(nn.Module):
                  drop_path_rate: float = 0.):
         super().__init__()
         act_layer = functools.partial(nn.SiLU, inplace=True)
-        self.conv1 = nn.Conv3d(in_channels, stem_features, (1, 3, 3),
-                               stride=(1, 2, 2), padding=(0, 1, 1), bias=False)
-        self.bn1 = BatchNormAct(stem_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer)
 
-        prev_num_features = stem_features
+        num_blocks = len(block_features)
+        assert num_blocks and num_blocks == len(block_strides)
+        next_num_features = block_features[0]
+        self.conv1 = nn.Conv3d(in_channels, next_num_features, (1, 1, 1), bias=False)
+        self.bn1 = BatchNormAct(next_num_features, bn_layer=nn.BatchNorm3d, apply_act=False)
+
         blocks = []
-        for block_index, (num_features, stride) in enumerate(zip(block_features, block_strides)):
+        for block_index in range(num_blocks):
+            num_features = block_features[block_index]
+            stride = block_strides[block_index]
+            if block_index < num_blocks - 1:
+                next_num_features = block_features[block_index + 1]
             block_drop_path_rate = drop_path_rate * block_index / len(block_features)
+
             blocks += [
-                PositionalEncoding3D(prev_num_features),
+                PositionalEncoding3D(num_features),
                 InvertedResidual3d(
-                    prev_num_features,
                     num_features,
+                    next_num_features,
                     stride=(1, stride, stride),
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
@@ -242,7 +248,6 @@ class DwiseNeuro(nn.Module):
                     bias=False,
                 )
             ]
-            prev_num_features = num_features
         self.blocks = nn.Sequential(*blocks)
 
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
@@ -250,7 +255,7 @@ class DwiseNeuro(nn.Module):
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts += [
-                Readout(prev_num_features, readout_features, readout_output,
+                Readout(next_num_features, readout_features, readout_output,
                         groups=readout_groups, act_layer=act_layer, drop_rate=drop_rate)
             ]
 
