@@ -166,41 +166,60 @@ class PositionalEncoding3D(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
-class Readout(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 hidden_features: int,
-                 out_features: int,
-                 groups: int = 1,
-                 act_layer: Callable = nn.ReLU,
-                 drop_rate: float = 0.):
+class ChannelShuffle(nn.Module):
+    def __init__(self, groups: int):
         super().__init__()
-        self.out_features = out_features
         self.groups = groups
-        self.layer1 = nn.Sequential(
-            nn.Dropout1d(p=drop_rate / 2.),
-            nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
-            BatchNormAct(hidden_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-        )
-        self.layer2 = nn.Sequential(
-            nn.Dropout1d(p=drop_rate),
-            nn.Conv1d(hidden_features,
-                      math.ceil(out_features / groups) * groups, (1,),
-                      groups=groups, bias=True),
-        )
-        self.gate = nn.Softplus()
 
     def forward(self, x):
-        x = self.layer1(x)
-
         if self.groups > 1:
-            # Shuffle channels between groups
             b, c, t = x.shape
             x = x.view(b, -1, self.groups, t)
             x = torch.transpose(x, 1, 2)
             x = x.reshape(b, -1, t)
+        return x
 
-        x = self.layer2(x)
+
+class Readout(nn.Module):
+    def __init__(self,
+                 in_features: int,
+                 out_features: int,
+                 layers_features: tuple[int, ...],
+                 layers_groups: tuple[int, ...],
+                 final_groups: int,
+                 kernel_size: int = 1,
+                 act_layer: Callable = nn.ReLU,
+                 drop_rate: float = 0.):
+        super().__init__()
+        self.out_features = out_features
+
+        prev_num_features = in_features
+        layers = []
+        for layer_index, (features, groups) in enumerate(zip(layers_features, layers_groups)):
+            layer_drop_rate = drop_rate * layer_index / len(layers_features)
+            layers += [
+                nn.Sequential(
+                    nn.Dropout1d(p=layer_drop_rate),
+                    nn.Conv1d(prev_num_features, features, (kernel_size,),
+                              padding="same", groups=groups, bias=False),
+                    BatchNormAct(features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+                    ChannelShuffle(groups),
+                )
+            ]
+            prev_num_features = features
+        self.layers = nn.Sequential(*layers)
+
+        self.final_layer = nn.Sequential(
+            nn.Dropout1d(p=drop_rate),
+            nn.Conv1d(prev_num_features,
+                      math.ceil(out_features / final_groups) * final_groups, (1,),
+                      groups=final_groups, bias=True),
+        )
+        self.gate = nn.Softplus()
+
+    def forward(self, x):
+        x = self.layers(x)
+        x = self.final_layer(x)
         x = x[:, :self.out_features]
         x = self.gate(x)
         return x
@@ -215,8 +234,10 @@ class DwiseNeuro(nn.Module):
                  block_strides: tuple[int, ...] = (2, 2, 2, 2),
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 readout_features: int = 4096,
-                 readout_groups: int = 4,
+                 readout_features: tuple[int, ...] = (2048, 4096),
+                 readout_groups: tuple[int, ...] = (2, 4),
+                 readout_final_groups: int = 8,
+                 readout_kernel_size: int = 1,
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
@@ -250,8 +271,10 @@ class DwiseNeuro(nn.Module):
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts += [
-                Readout(prev_num_features, readout_features, readout_output,
-                        groups=readout_groups, act_layer=act_layer, drop_rate=drop_rate)
+                Readout(prev_num_features, readout_output, readout_features,
+                        readout_groups, readout_final_groups,
+                        kernel_size=readout_kernel_size,
+                        act_layer=act_layer, drop_rate=drop_rate)
             ]
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
