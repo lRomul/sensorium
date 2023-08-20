@@ -24,7 +24,7 @@ config = dict(
             "stem_features": 128,
             "block_features": (128, 128,
                                128, 128,
-                               128, 128,
+                               256, 256,
                                256, 256),
             "block_strides": (2, 1,
                               2, 1,
