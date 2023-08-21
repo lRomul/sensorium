@@ -21,8 +21,7 @@ config = dict(
         "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
             "in_channels": 5,
-            "stem_features": 128,
-            "block_features": (128, 128,
+            "block_features": (64, 64,
                                128, 128,
                                128, 128,
                                256, 256),
@@ -57,11 +56,11 @@ config = dict(
             "pad_fill_value": 0.,
         }),
         "responses_processor": ("identity", {}),
-        "amp": False,
+        "amp": True,
         "iter_size": 1,
     },
     mixup={
         "alpha": 0.4,
-        "prob": 0.0,
+        "prob": 0.5,
     },
 )
