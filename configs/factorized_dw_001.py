@@ -28,7 +28,7 @@ config = dict(
                               2, 1,
                               2, 1),
             "kernel_size": 3,
-            "expansion_ratio": 4,
+            "expansion_ratio": 6,
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
             "readout_groups": 4,
