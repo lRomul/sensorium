@@ -71,7 +71,8 @@ class InvertedResidual3d(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
-                 stride: tuple[int, int, int] = (1, 1, 1),
+                 kernel_size: int = 3,
+                 spatial_stride: int = 1,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  act_layer: Callable = nn.ReLU,
@@ -80,27 +81,42 @@ class InvertedResidual3d(nn.Module):
         super().__init__()
         mid_features = in_features * expansion_ratio
         bn_layer = nn.BatchNorm3d
+        padding = kernel_size // 2
+        stride = (1, spatial_stride, spatial_stride)
 
         # Point-wise expansion
-        self.conv_pw = nn.Conv3d(in_features, mid_features, (1, 1, 1), bias=bias)
-        self.bn1 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
+        self.conv_pw = nn.Sequential(
+            nn.Conv3d(in_features, mid_features, (1, 1, 1), bias=bias),
+            BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
+        )
 
-        # Depth-wise convolution
-        self.conv_dw = nn.Conv3d(mid_features, mid_features, (3, 3, 3), stride=stride,
-                                 padding=(1, 1, 1), groups=mid_features, bias=bias)
-        self.bn2 = BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer)
+        # Spatial depth-wise convolution
+        self.spat_covn_dw = nn.Sequential(
+            nn.Conv3d(mid_features, mid_features, (1, kernel_size, kernel_size), stride=stride,
+                      padding=(0, padding, padding), groups=mid_features, bias=bias),
+            BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
+        )
+
+        # Spatial depth-wise convolution
+        self.temp_covn_dw = nn.Sequential(
+            nn.Conv3d(mid_features, mid_features, (kernel_size, 1, 1), stride=stride,
+                      padding=(padding, 0, 0), groups=mid_features, bias=bias),
+            BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
+        )
 
         # Squeeze-and-excitation
         self.se = SqueezeExcite3d(mid_features, act_layer=act_layer, reduce_ratio=se_reduce_ratio)
 
         # Point-wise linear projection
-        self.conv_pwl = nn.Conv3d(mid_features, out_features, (1, 1, 1), bias=bias)
-        self.bn3 = BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False)
+        self.conv_pwl = nn.Sequential(
+            nn.Conv3d(mid_features, out_features, (1, 1, 1), bias=bias),
+            BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False),
+        )
 
         # Projection shortcut
         self.drop_path = DropPath(drop_prob=drop_path_rate)
         self.proj_sc = nn.Sequential(
-            nn.Conv3d(in_features, out_features, kernel_size=(1, 1, 1), stride=stride,
+            nn.Conv3d(in_features, out_features, (1, 1, 1), stride=stride,
                       groups=math.gcd(in_features, out_features), bias=bias),
             BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False),
         )
@@ -108,12 +124,9 @@ class InvertedResidual3d(nn.Module):
     def forward(self, x):
         shortcut = x
         x = self.conv_pw(x)
-        x = self.bn1(x)
-        x = self.conv_dw(x)
-        x = self.bn2(x)
+        x = self.spat_covn_dw(x) + self.temp_covn_dw(x)
         x = self.se(x)
         x = self.conv_pwl(x)
-        x = self.bn3(x)
         x = self.drop_path(x) + self.proj_sc(shortcut)
         return x
 
@@ -212,6 +225,7 @@ class DwiseNeuro(nn.Module):
                  in_channels: int = 1,
                  block_features: tuple[int, ...] = (64, 128, 256, 512),
                  block_strides: tuple[int, ...] = (2, 2, 2, 2),
+                 kernel_size: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  readout_features: int = 4096,
@@ -224,8 +238,10 @@ class DwiseNeuro(nn.Module):
         num_blocks = len(block_features)
         assert num_blocks and num_blocks == len(block_strides)
         next_num_features = block_features[0]
-        self.conv1 = nn.Conv3d(in_channels, next_num_features, (1, 1, 1), bias=False)
-        self.bn1 = BatchNormAct(next_num_features, bn_layer=nn.BatchNorm3d, apply_act=False)
+        self.stem = nn.Sequential(
+            nn.Conv3d(in_channels, next_num_features, (1, 1, 1), bias=False),
+            BatchNormAct(next_num_features, bn_layer=nn.BatchNorm3d, apply_act=False),
+        )
 
         blocks = []
         for block_index in range(num_blocks):
@@ -240,7 +256,8 @@ class DwiseNeuro(nn.Module):
                 InvertedResidual3d(
                     num_features,
                     next_num_features,
-                    stride=(1, stride, stride),
+                    kernel_size=kernel_size,
+                    spatial_stride=stride,
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
@@ -260,8 +277,7 @@ class DwiseNeuro(nn.Module):
             ]
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
-        x = self.conv1(x)
-        x = self.bn1(x)
+        x = self.stem(x)
         x = self.blocks(x)
         x = self.pool(x).squeeze(-1).squeeze(-1)
 
