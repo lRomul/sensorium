@@ -23,7 +23,7 @@ config = dict(
             "in_channels": 5,
             "block_features": (128, 128,
                                128, 128,
-                               128, 128),
+                               256, 256),
             "block_strides": (2, 1,
                               2, 1,
                               2, 1),
