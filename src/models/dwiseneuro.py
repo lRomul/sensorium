@@ -99,7 +99,7 @@ class InvertedResidual3d(nn.Module):
 
         # Spatial depth-wise convolution
         self.temp_covn_dw = nn.Sequential(
-            nn.Conv3d(mid_features, mid_features, (kernel_size, 1, 1), stride=stride,
+            nn.Conv3d(mid_features, mid_features, (kernel_size, 1, 1),
                       padding=(padding, 0, 0), groups=mid_features, bias=bias),
             BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
         )
@@ -124,7 +124,8 @@ class InvertedResidual3d(nn.Module):
     def forward(self, x):
         shortcut = x
         x = self.conv_pw(x)
-        x = self.spat_covn_dw(x) + self.temp_covn_dw(x)
+        x = self.spat_covn_dw(x)
+        x = self.temp_covn_dw(x)
         x = self.se(x)
         x = self.conv_pwl(x)
         x = self.drop_path(x) + self.proj_sc(shortcut)
