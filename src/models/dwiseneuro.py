@@ -283,6 +283,7 @@ class DwiseNeuro(nn.Module):
                     bias=False,
                 )
             ]
+        blocks.append(PositionalEncoding3d(next_num_features))
         self.blocks = nn.Sequential(*blocks)
 
         self.pool = GeneralizedMeanPooling3d(3.0, (None, 1, 1))
