@@ -27,7 +27,7 @@ config = dict(
             "block_strides": (2, 1,
                               2, 1,
                               2, 1),
-            "kernel_size": 3,
+            "kernel_size": 5,
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
