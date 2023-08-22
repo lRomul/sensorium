@@ -94,15 +94,16 @@ class InvertedResidual3d(nn.Module):
         self.spat_covn_dw = nn.Sequential(
             nn.Conv3d(mid_features, mid_features, (1, kernel_size, kernel_size), stride=stride,
                       padding=(0, padding, padding), groups=mid_features, bias=bias),
-            BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
+            BatchNormAct(mid_features, bn_layer=bn_layer, apply_act=False),
         )
 
         # Spatial depth-wise convolution
         self.temp_covn_dw = nn.Sequential(
-            nn.Conv3d(mid_features, mid_features, (kernel_size, 1, 1),
+            nn.Conv3d(mid_features, mid_features, (kernel_size, 1, 1), stride=stride,
                       padding=(padding, 0, 0), groups=mid_features, bias=bias),
-            BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
+            BatchNormAct(mid_features, bn_layer=bn_layer, apply_act=False),
         )
+        self.act_dw = act_layer()
 
         # Squeeze-and-excitation
         self.se = SqueezeExcite3d(mid_features, act_layer=act_layer, reduce_ratio=se_reduce_ratio)
@@ -124,8 +125,8 @@ class InvertedResidual3d(nn.Module):
     def forward(self, x):
         shortcut = x
         x = self.conv_pw(x)
-        x = self.spat_covn_dw(x)
-        x = self.temp_covn_dw(x)
+        x = self.spat_covn_dw(x) + self.temp_covn_dw(x)
+        x = self.act_dw(x)
         x = self.se(x)
         x = self.conv_pwl(x)
         x = self.drop_path(x) + self.proj_sc(shortcut)
