@@ -71,7 +71,8 @@ class InvertedResidual3d(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
-                 kernel_size: int = 3,
+                 spatial_kernel: int = 3,
+                 temporal_kernel: int = 3,
                  spatial_stride: int = 1,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
@@ -81,7 +82,6 @@ class InvertedResidual3d(nn.Module):
         super().__init__()
         mid_features = in_features * expansion_ratio
         bn_layer = nn.BatchNorm3d
-        padding = kernel_size // 2
         stride = (1, spatial_stride, spatial_stride)
 
         # Point-wise expansion
@@ -91,16 +91,20 @@ class InvertedResidual3d(nn.Module):
         )
 
         # Spatial depth-wise convolution
+        spatial_padding = spatial_kernel // 2
         self.spat_covn_dw = nn.Sequential(
-            nn.Conv3d(mid_features, mid_features, (1, kernel_size, kernel_size), stride=stride,
-                      padding=(0, padding, padding), groups=mid_features, bias=bias),
+            nn.Conv3d(mid_features, mid_features, (1, spatial_kernel, spatial_kernel),
+                      stride=stride, padding=(0, spatial_padding, spatial_padding),
+                      groups=mid_features, bias=bias),
             BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
         )
 
-        # Spatial depth-wise convolution
+        # Temporal depth-wise convolution
+        temporal_padding = temporal_kernel // 2
         self.temp_covn_dw = nn.Sequential(
-            nn.Conv3d(mid_features, mid_features, (kernel_size, 1, 1),
-                      padding=(padding, 0, 0), groups=mid_features, bias=bias),
+            nn.Conv3d(mid_features, mid_features, (temporal_kernel, 1, 1),
+                      stride=(1, 1, 1), padding=(temporal_padding, 0, 0),
+                      groups=mid_features, bias=bias),
             BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
         )
 
@@ -224,9 +228,10 @@ class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
                  in_channels: int = 1,
-                 block_features: tuple[int, ...] = (64, 128, 256, 512),
-                 block_strides: tuple[int, ...] = (2, 2, 2, 2),
-                 kernel_size: int = 3,
+                 features: tuple[int, ...] = (64, 128, 256, 512),
+                 spatial_strides: tuple[int, ...] = (2, 2, 2, 2),
+                 spatial_kernel: int = 3,
+                 temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  readout_features: int = 4096,
@@ -236,9 +241,9 @@ class DwiseNeuro(nn.Module):
         super().__init__()
         act_layer = functools.partial(nn.SiLU, inplace=True)
 
-        num_blocks = len(block_features)
-        assert num_blocks and num_blocks == len(block_strides)
-        next_num_features = block_features[0]
+        num_blocks = len(features)
+        assert num_blocks and num_blocks == len(spatial_strides)
+        next_num_features = features[0]
         self.stem = nn.Sequential(
             nn.Conv3d(in_channels, next_num_features, (1, 1, 1), bias=False),
             BatchNormAct(next_num_features, bn_layer=nn.BatchNorm3d, apply_act=False),
@@ -246,19 +251,20 @@ class DwiseNeuro(nn.Module):
 
         blocks = []
         for block_index in range(num_blocks):
-            num_features = block_features[block_index]
-            stride = block_strides[block_index]
+            num_features = features[block_index]
+            spatial_stride = spatial_strides[block_index]
             if block_index < num_blocks - 1:
-                next_num_features = block_features[block_index + 1]
-            block_drop_path_rate = drop_path_rate * block_index / len(block_features)
+                next_num_features = features[block_index + 1]
+            block_drop_path_rate = drop_path_rate * block_index / len(features)
 
             blocks += [
                 PositionalEncoding3D(num_features),
                 InvertedResidual3d(
                     num_features,
                     next_num_features,
-                    kernel_size=kernel_size,
-                    spatial_stride=stride,
+                    spatial_kernel=spatial_kernel,
+                    temporal_kernel=temporal_kernel,
+                    spatial_stride=spatial_stride,
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
