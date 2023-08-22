@@ -132,7 +132,7 @@ class InvertedResidual3d(nn.Module):
         return x
 
 
-class PositionalEncoding3D(nn.Module):
+class PositionalEncoding3d(nn.Module):
     def __init__(self, channels):
         super().__init__()
         self.orig_channels = channels
@@ -178,6 +178,23 @@ class PositionalEncoding3D(nn.Module):
             cached_encoding = self.create_cached_encoding(x)
 
         return x + cached_encoding.expand_as(x)
+
+
+class GeneralizedMeanPooling3d(nn.Module):
+    def __init__(self,
+                 norm: float,
+                 output_size: tuple[int | None, int | None, int | None] = (1, 1, 1),
+                 eps: float = 1e-6):
+        super().__init__()
+        assert norm > 0
+        self.p = nn.Parameter(torch.ones(1) * norm)
+        self.output_size = output_size
+        self.eps = eps
+
+    def forward(self, x):
+        x = x.clamp(min=self.eps).pow(self.p)
+        x = torch.nn.functional.adaptive_avg_pool3d(x, self.output_size).pow(1. / self.p)
+        return x
 
 
 class Readout(nn.Module):
@@ -253,7 +270,7 @@ class DwiseNeuro(nn.Module):
             block_drop_path_rate = drop_path_rate * block_index / len(block_features)
 
             blocks += [
-                PositionalEncoding3D(num_features),
+                PositionalEncoding3d(num_features),
                 InvertedResidual3d(
                     num_features,
                     next_num_features,
@@ -268,7 +285,7 @@ class DwiseNeuro(nn.Module):
             ]
         self.blocks = nn.Sequential(*blocks)
 
-        self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
+        self.pool = GeneralizedMeanPooling3d(3.0, (None, 1, 1))
 
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
