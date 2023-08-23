@@ -136,7 +136,7 @@ class InvertedResidual3d(nn.Module):
         return x
 
 
-class PositionalEncoding3D(nn.Module):
+class PositionalEncoding3d(nn.Module):
     def __init__(self, channels):
         super().__init__()
         self.orig_channels = channels
@@ -258,7 +258,7 @@ class DwiseNeuro(nn.Module):
             block_drop_path_rate = drop_path_rate * block_index / len(features)
 
             blocks += [
-                PositionalEncoding3D(num_features),
+                PositionalEncoding3d(num_features),
                 InvertedResidual3d(
                     num_features,
                     next_num_features,

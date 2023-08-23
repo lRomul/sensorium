@@ -28,7 +28,7 @@ config = dict(
                                 2, 1, 1,
                                 2, 1),
             "spatial_kernel": 3,
-            "temporal_kernel": 3,
+            "temporal_kernel": 5,
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
