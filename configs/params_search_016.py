@@ -21,10 +21,10 @@ config = dict(
         "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
             "in_channels": 5,
-            "features": (64, 64, 64, 64, 64,
+            "features": (64, 64, 64, 64,
                          128, 128, 128,
                          256, 256),
-            "spatial_strides": (2, 1, 1, 1, 1,
+            "spatial_strides": (2, 1, 1, 1,
                                 2, 1, 1,
                                 2, 1),
             "spatial_kernel": 3,
@@ -48,7 +48,7 @@ config = dict(
         "device": "cuda:0",
         "frame_stack": {
             "size": frame_stack_size,
-            "step": 2,
+            "step": 1,
             "position": "last",
         },
         "inputs_processor": ("stack_inputs", {
