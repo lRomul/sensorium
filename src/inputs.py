@@ -21,16 +21,13 @@ class StackInputsProcessor(InputsProcessor):
 
     def __call__(self, frames: np.ndarray, behavior: np.ndarray, pupil_center: np.ndarray) -> torch.Tensor:
         length = frames.shape[-1]
-        input_array = np.full((5, length, self.size[1], self.size[0]), self.pad_fill_value, dtype=np.float32)
+        input_array = np.full((1, length, self.size[1], self.size[0]), self.pad_fill_value, dtype=np.float32)
 
         frames = np.transpose(frames.astype(np.float32), (2, 0, 1))
         height, width = frames.shape[-2:]
         height_start = (self.size[1] - height) // 2
         width_start = (self.size[0] - width) // 2
         input_array[0, :, height_start: height_start + height, width_start: width_start + width] = frames
-
-        input_array[1:3] = behavior[:, :, None, None]
-        input_array[3:] = pupil_center[:, :, None, None]
 
         tensor_frames = torch.from_numpy(input_array)
         return tensor_frames

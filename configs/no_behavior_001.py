@@ -20,7 +20,7 @@ config = dict(
     argus_params={
         "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
-            "in_channels": 5,
+            "in_channels": 1,
             "features": (64, 64, 64, 64,
                          128, 128, 128,
                          256, 256),
