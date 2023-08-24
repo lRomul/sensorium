@@ -196,10 +196,23 @@ class Readout(nn.Module):
         super().__init__()
         self.out_features = out_features
         self.groups = groups
+
         self.behavior_layer = nn.Sequential(
-            nn.Conv1d(behavior_features, in_features, (1,), groups=1, bias=False),
-            BatchNormAct(in_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+            nn.Conv3d(behavior_features, in_features, (1, 1, 1), groups=1, bias=False),
+            nn.Upsample(scale_factor=(1, 2, 2), mode="nearest"),
+            PositionalEncoding3d(in_features),
+            nn.Conv3d(in_features, in_features, (1, 3, 3), padding=(0, 1, 1), groups=1, bias=False),
+            BatchNormAct(in_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
+            nn.Upsample(scale_factor=(1, 2, 2), mode="nearest"),
+            PositionalEncoding3d(in_features),
+            nn.Conv3d(in_features, in_features, (1, 3, 3), padding=(0, 1, 1), groups=1, bias=False),
+            BatchNormAct(in_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
+            nn.Upsample(scale_factor=(1, 2, 2), mode="nearest"),
+            PositionalEncoding3d(in_features),
+            nn.Conv3d(in_features, in_features, (1, 3, 3), padding=(0, 1, 1), groups=1, bias=False),
+            BatchNormAct(in_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
         )
+        self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
         self.layer1 = nn.Sequential(
             nn.Dropout1d(p=drop_rate / 2.),
             nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
@@ -214,7 +227,9 @@ class Readout(nn.Module):
         self.gate = nn.Softplus()
 
     def forward(self, x, behavior):
-        x = x + self.behavior_layer(behavior)
+        x = x + self.behavior_layer(behavior.unsqueeze(-1).unsqueeze(-1))
+
+        x = self.pool(x).squeeze(-1).squeeze(-1)
         x = self.layer1(x)
 
         if self.groups > 1:
@@ -280,7 +295,6 @@ class DwiseNeuro(nn.Module):
                 )
             ]
         self.blocks = nn.Sequential(*blocks)
-        self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
@@ -296,7 +310,6 @@ class DwiseNeuro(nn.Module):
         frames, behaviors = x
         frames = self.stem(frames)
         frames = self.blocks(frames)
-        frames = self.pool(frames).squeeze(-1).squeeze(-1)
 
         if index is None:
             return [readout(frames, behavior) for readout, behavior in zip(self.readouts, behaviors)]
