@@ -196,9 +196,12 @@ class Readout(nn.Module):
         super().__init__()
         self.out_features = out_features
         self.groups = groups
+        mid_behavior_features = in_features // 2
         self.behavior_layer = nn.Sequential(
-            nn.Conv1d(behavior_features, in_features, (1,), groups=1, bias=False),
-            BatchNormAct(in_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+            nn.Conv1d(behavior_features, mid_behavior_features, (1,), groups=1, bias=False),
+            BatchNormAct(mid_behavior_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+            nn.Conv1d(mid_behavior_features, in_features, (1,), groups=1, bias=False),
+            BatchNormAct(in_features, bn_layer=nn.BatchNorm1d, apply_act=False),
         )
         self.layer1 = nn.Sequential(
             nn.Dropout1d(p=drop_rate / 2.),
