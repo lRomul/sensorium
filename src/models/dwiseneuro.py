@@ -190,11 +190,16 @@ class Readout(nn.Module):
                  hidden_features: int,
                  out_features: int,
                  groups: int = 1,
+                 behavior_features: int = 4,
                  act_layer: Callable = nn.ReLU,
                  drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
         self.groups = groups
+        self.behavior_layer = nn.Sequential(
+            nn.Conv1d(behavior_features, in_features, (1,), groups=1, bias=False),
+            BatchNormAct(in_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+        )
         self.layer1 = nn.Sequential(
             nn.Dropout1d(p=drop_rate / 2.),
             nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
@@ -208,7 +213,8 @@ class Readout(nn.Module):
         )
         self.gate = nn.Softplus()
 
-    def forward(self, x):
+    def forward(self, x, behavior):
+        x = x + self.behavior_layer(behavior)
         x = self.layer1(x)
 
         if self.groups > 1:
@@ -234,6 +240,7 @@ class DwiseNeuro(nn.Module):
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
+                 behavior_features: int = 4,
                  readout_features: int = 4096,
                  readout_groups: int = 4,
                  drop_rate: float = 0.,
@@ -273,22 +280,26 @@ class DwiseNeuro(nn.Module):
                 )
             ]
         self.blocks = nn.Sequential(*blocks)
-
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts += [
                 Readout(next_num_features, readout_features, readout_output,
-                        groups=readout_groups, act_layer=act_layer, drop_rate=drop_rate)
+                        groups=readout_groups, behavior_features=behavior_features,
+                        act_layer=act_layer, drop_rate=drop_rate)
             ]
 
-    def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
-        x = self.stem(x)
-        x = self.blocks(x)
-        x = self.pool(x).squeeze(-1).squeeze(-1)
+    def forward(self,
+                x: tuple[torch.Tensor, list[torch.Tensor] | torch.Tensor],
+                index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
+        frames, behaviors = x
+        frames = self.stem(frames)
+        frames = self.blocks(frames)
+        frames = self.pool(frames).squeeze(-1).squeeze(-1)
 
         if index is None:
-            return [readout(x) for readout in self.readouts]
+            return [readout(frames, behavior) for readout, behavior in zip(self.readouts, behaviors)]
         else:
-            return self.readouts[index](x)
+            assert torch.is_tensor(behaviors)
+            return self.readouts[index](frames, behaviors)

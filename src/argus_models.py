@@ -7,6 +7,7 @@ from argus.loss import pytorch_losses
 from argus.utils import deep_to, deep_detach, deep_chunk
 
 from src.ema import ModelEma
+from src.typing import Inputs
 from src.losses import MicePoissonLoss
 from src.models.dwiseneuro import DwiseNeuro
 
@@ -76,7 +77,7 @@ class MouseModel(argus.Model):
                 'loss': loss.item()
             }
 
-    def predict(self, input, mouse_index: int | None = None):
+    def predict(self, input: Inputs, mouse_index: int):
         self._check_predict_ready()
         with torch.no_grad():
             self.eval()

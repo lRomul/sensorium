@@ -3,7 +3,7 @@ from src import constants
 
 
 image_size = (64, 64)
-batch_size = 16
+batch_size = 4
 base_lr = 3e-4
 frame_stack_size = 16
 config = dict(
@@ -31,6 +31,7 @@ config = dict(
             "temporal_kernel": 5,
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
+            "behavior_features": 4,
             "readout_features": 1024 * 8,
             "readout_groups": 4,
             "drop_rate": 0.2,

@@ -5,6 +5,8 @@ import numpy as np
 
 import torch
 
+from src.typing import Responses
+
 
 def responses_to_tensor(responses: np.ndarray) -> torch.Tensor:
     responses_tensor = torch.from_numpy(responses)
@@ -14,12 +16,12 @@ def responses_to_tensor(responses: np.ndarray) -> torch.Tensor:
 
 class ResponsesProcessor(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def __call__(self, responses: np.ndarray) -> torch.Tensor:
+    def __call__(self, responses: np.ndarray) -> Responses:
         pass
 
 
 class IdentityResponsesProcessor(ResponsesProcessor):
-    def __call__(self, responses: np.ndarray) -> torch.Tensor:
+    def __call__(self, responses: np.ndarray) -> Responses:
         return responses_to_tensor(responses)
 
 
@@ -27,7 +29,7 @@ class IndexingResponsesProcessor(ResponsesProcessor):
     def __init__(self, index: int | list[int]):
         self.index = index
 
-    def __call__(self, responses: np.ndarray) -> torch.Tensor:
+    def __call__(self, responses: np.ndarray) -> Responses:
         responses = responses[..., self.index]
         responses_tensor = responses_to_tensor(responses)
         return responses_tensor

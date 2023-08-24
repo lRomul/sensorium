@@ -39,7 +39,10 @@ class Predictor:
                       behavior: np.ndarray,
                       pupil_center: np.ndarray,
                       mouse_index: int) -> np.ndarray:
-        inputs = self.inputs_processor(video, behavior, pupil_center).to(self.model.device)
+        video_tensor, behavior_tensor = self.inputs_processor(video, behavior, pupil_center)
+        video_tensor = video_tensor.to(self.model.device)
+        behavior_tensor = behavior_tensor.to(self.model.device)
+
         length = video.shape[-1]
         responses = np.zeros((constants.num_neurons[mouse_index], length), dtype=np.float32)
         blend_weights = np.zeros(length, np.float32)
@@ -48,7 +51,11 @@ class Predictor:
             length - self.indexes_generator.ahead
         ):
             indexes = self.indexes_generator.make_indexes(index)
-            prediction = self.model.predict(inputs[:, indexes].unsqueeze(0), mouse_index)[0]
+            inputs = (
+                video_tensor[:, indexes].unsqueeze(0),
+                behavior_tensor[:, indexes].unsqueeze(0),
+            )
+            prediction = self.model.predict(inputs, mouse_index)[0]
             responses[..., indexes] += prediction.cpu().numpy()
             blend_weights[indexes] += self.blend_weights
         responses /= np.clip(blend_weights, 1.0, None)

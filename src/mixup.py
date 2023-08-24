@@ -1,8 +1,6 @@
-import torch
-
 import numpy as np
 
-SampleType = tuple[torch.Tensor, torch.Tensor]
+from src.typing import MouseSample
 
 
 class Mixup:
@@ -13,10 +11,11 @@ class Mixup:
     def use(self):
         return np.random.random() < self.prob
 
-    def __call__(self, sample1: SampleType, sample2: SampleType) -> SampleType:
-        inputs1, target1 = sample1
-        inputs2, target2 = sample2
+    def __call__(self, sample1: MouseSample, sample2: MouseSample) -> MouseSample:
+        (frames1, behavior1), target1 = sample1
+        (frames2, behavior2), target2 = sample2
         lam = np.random.beta(self.alpha, self.alpha)
-        inputs = (1 - lam) * inputs1 + lam * inputs2
+        frames = (1 - lam) * frames1 + lam * frames2
+        behavior = (1 - lam) * behavior1 + lam * behavior2
         target = (1 - lam) * target1 + lam * target2
-        return inputs, target
+        return (frames, behavior), target
