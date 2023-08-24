@@ -210,7 +210,7 @@ class Readout(nn.Module):
             nn.Upsample(scale_factor=(1, 2, 2), mode="nearest"),
             PositionalEncoding3d(in_features),
             nn.Conv3d(in_features, in_features, (1, 3, 3), padding=(0, 1, 1), groups=1, bias=False),
-            BatchNormAct(in_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
+            BatchNormAct(in_features, bn_layer=nn.BatchNorm3d, act_layer=nn.Sigmoid),
         )
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
         self.layer1 = nn.Sequential(
@@ -227,7 +227,7 @@ class Readout(nn.Module):
         self.gate = nn.Softplus()
 
     def forward(self, x, behavior):
-        x = x + self.behavior_layer(behavior.unsqueeze(-1).unsqueeze(-1))
+        x = x * self.behavior_layer(behavior.unsqueeze(-1).unsqueeze(-1))
 
         x = self.pool(x).squeeze(-1).squeeze(-1)
         x = self.layer1(x)
