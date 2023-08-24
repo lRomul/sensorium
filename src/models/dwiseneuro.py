@@ -199,10 +199,8 @@ class BehaviorNet(nn.Module):
             nn.Conv3d(behavior_features, out_features, (1, 1, 1), bias=False),
             BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, apply_act=False),
         )
-        self.upsample = nn.Sequential(
-            nn.Upsample(scale_factor=(1, 8, 8), mode="nearest"),
-            PositionalEncoding3d(out_features),
-        )
+        self.upsample = nn.Upsample(scale_factor=(1, 8, 8), mode="nearest")
+        self.pos_enc = PositionalEncoding3d(out_features)
         self.dw_block = InvertedResidual3d(
             out_features,
             out_features,
@@ -221,6 +219,7 @@ class BehaviorNet(nn.Module):
         behavior = self.stem(behavior.unsqueeze(-1).unsqueeze(-1))
         behavior = self.upsample(behavior)
         x = x + self.drop_path(behavior)
+        x = self.pos_enc(x)
         x = self.dw_block(x)
         return x
 
