@@ -196,15 +196,16 @@ class BehaviorNet(nn.Module):
         super().__init__()
         self.stem = nn.Sequential(
             nn.Conv3d(behavior_features, out_features, (1, 1, 1), bias=False),
-            BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
+            BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, apply_act=False),
         )
-        kernel_size = (temporal_kernel, spatial_kernel, spatial_kernel)
-        padding = (temporal_kernel // 2, spatial_kernel // 2, spatial_kernel // 2)
+        spatial_padding = spatial_kernel // 2
+        temporal_padding = temporal_kernel // 2
         num_upsamples = math.log2(in_spatial_size)
         assert num_upsamples.is_integer()
         self.upsamples = nn.ModuleList()
         self.pools = nn.ModuleList()
-        self.convs = nn.ModuleList()
+        self.dw_convs = nn.ModuleList()
+        self.pwl_convs = nn.ModuleList()
         for upsample_index in range(int(num_upsamples)):
             self.upsamples.append(
                 nn.Sequential(
@@ -214,10 +215,21 @@ class BehaviorNet(nn.Module):
             )
             spatial_size = 2 ** (upsample_index + 1)
             self.pools.append(nn.AdaptiveAvgPool3d((None, spatial_size, spatial_size)))
-            self.convs.append(
+            self.dw_convs.append(
                 nn.Sequential(
-                    nn.Conv3d(out_features, out_features, kernel_size,
-                              padding=padding, groups=out_features, bias=False),
+                    nn.Conv3d(out_features, out_features, (1, spatial_kernel, spatial_kernel),
+                              stride=(1, 1, 1), padding=(0, spatial_padding, spatial_padding),
+                              groups=out_features, bias=False),
+                    BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
+                    nn.Conv3d(out_features, out_features, (temporal_kernel, 1, 1),
+                              stride=(1, 1, 1), padding=(temporal_padding, 0, 0),
+                              groups=out_features, bias=False),
+                    BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
+                )
+            )
+            self.pwl_convs.append(
+                nn.Sequential(
+                    nn.Conv3d(out_features, out_features, (1, 1, 1), bias=False),
                     BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
                 )
             )
@@ -225,10 +237,14 @@ class BehaviorNet(nn.Module):
 
     def forward(self, x, behavior):
         behavior = self.stem(behavior.unsqueeze(-1).unsqueeze(-1))
-        for upsample, pool, conv in zip(self.upsamples, self.pools, self.convs):
+        for pool, dw_conv, pwl_conv, upsample in zip(
+                self.pools, self.dw_convs, self.pwl_convs, self.upsamples
+        ):
             behavior = upsample(behavior)
             behavior = pool(x) + behavior
-            behavior = conv(behavior)
+            behavior = dw_conv(behavior)
+            behavior = pwl_conv(behavior)
+
         return x + self.drop_path(behavior)
 
 
