@@ -184,6 +184,42 @@ class PositionalEncoding3d(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
+class BehaviorNet(nn.Module):
+    def __init__(self,
+                 behavior_features: int,
+                 out_features: int,
+                 scale_factors: tuple[int, ...] = (2, 2, 2),
+                 spatial_kernel: int = 3,
+                 temporal_kernel: int = 5,
+                 act_layer: Callable = nn.ReLU,
+                 drop_path_rate: float = 0.):
+        super().__init__()
+        self.stem = nn.Sequential(
+            nn.Conv3d(behavior_features, out_features, (1, 1, 1), bias=False),
+            BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, apply_act=False),
+        )
+        kernel_size = (temporal_kernel, spatial_kernel, spatial_kernel)
+        padding = (temporal_kernel // 2, spatial_kernel // 2, spatial_kernel // 2)
+        self.upsample = nn.Sequential()
+        for scale_factor in scale_factors:
+            self.upsample.append(
+                nn.Sequential(
+                    nn.Upsample(scale_factor=(1, scale_factor, scale_factor), mode="nearest"),
+                    PositionalEncoding3d(out_features),
+                    nn.Conv3d(out_features, out_features, kernel_size,
+                              padding=padding, groups=out_features, bias=False),
+                    BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
+                )
+            )
+        self.drop_path = DropPath(drop_prob=drop_path_rate)
+
+    def forward(self, x, behavior):
+        behavior = self.stem(behavior.unsqueeze(-1).unsqueeze(-1))
+        behavior = self.upsample(behavior)
+        x = x + self.drop_path(behavior)
+        return x
+
+
 class Readout(nn.Module):
     def __init__(self,
                  in_features: int,
@@ -197,20 +233,11 @@ class Readout(nn.Module):
         self.out_features = out_features
         self.groups = groups
 
-        self.behavior_layer = nn.Sequential(
-            nn.Conv3d(behavior_features, in_features, (1, 1, 1), groups=1, bias=False),
-            nn.Upsample(scale_factor=(1, 2, 2), mode="nearest"),
-            PositionalEncoding3d(in_features),
-            nn.Conv3d(in_features, in_features, (1, 3, 3), padding=(0, 1, 1), groups=1, bias=False),
-            BatchNormAct(in_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
-            nn.Upsample(scale_factor=(1, 2, 2), mode="nearest"),
-            PositionalEncoding3d(in_features),
-            nn.Conv3d(in_features, in_features, (1, 3, 3), padding=(0, 1, 1), groups=1, bias=False),
-            BatchNormAct(in_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
-            nn.Upsample(scale_factor=(1, 2, 2), mode="nearest"),
-            PositionalEncoding3d(in_features),
-            nn.Conv3d(in_features, in_features, (1, 3, 3), padding=(0, 1, 1), groups=1, bias=False),
-            BatchNormAct(in_features, bn_layer=nn.BatchNorm3d, act_layer=nn.Sigmoid),
+        self.behavior_net = BehaviorNet(
+            behavior_features=behavior_features,
+            out_features=in_features,
+            act_layer=act_layer,
+            drop_path_rate=drop_rate,
         )
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
         self.layer1 = nn.Sequential(
@@ -227,7 +254,7 @@ class Readout(nn.Module):
         self.gate = nn.Softplus()
 
     def forward(self, x, behavior):
-        x = x * self.behavior_layer(behavior.unsqueeze(-1).unsqueeze(-1))
+        x = self.behavior_net(x, behavior)
 
         x = self.pool(x).squeeze(-1).squeeze(-1)
         x = self.layer1(x)
@@ -271,7 +298,7 @@ class DwiseNeuro(nn.Module):
             BatchNormAct(next_num_features, bn_layer=nn.BatchNorm3d, apply_act=False),
         )
 
-        blocks = []
+        self.blocks = nn.Sequential()
         for block_index in range(num_blocks):
             num_features = features[block_index]
             spatial_stride = spatial_strides[block_index]
@@ -279,8 +306,8 @@ class DwiseNeuro(nn.Module):
                 next_num_features = features[block_index + 1]
             block_drop_path_rate = drop_path_rate * block_index / len(features)
 
-            blocks += [
-                PositionalEncoding3d(num_features),
+            self.blocks.append(PositionalEncoding3d(num_features))
+            self.blocks.append(
                 InvertedResidual3d(
                     num_features,
                     next_num_features,
@@ -293,16 +320,15 @@ class DwiseNeuro(nn.Module):
                     drop_path_rate=block_drop_path_rate,
                     bias=False,
                 )
-            ]
-        self.blocks = nn.Sequential(*blocks)
+            )
 
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
-            self.readouts += [
+            self.readouts.append(
                 Readout(next_num_features, readout_features, readout_output,
                         groups=readout_groups, behavior_features=behavior_features,
                         act_layer=act_layer, drop_rate=drop_rate)
-            ]
+            )
 
     def forward(self,
                 x: tuple[torch.Tensor, list[torch.Tensor] | torch.Tensor],
