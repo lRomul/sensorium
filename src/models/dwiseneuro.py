@@ -206,8 +206,7 @@ class BehaviorNet(nn.Module):
                 nn.Sequential(
                     nn.Upsample(scale_factor=(1, scale_factor, scale_factor), mode="nearest"),
                     PositionalEncoding3d(out_features),
-                    nn.Conv3d(out_features, out_features, kernel_size,
-                              padding=padding, groups=out_features, bias=False),
+                    nn.Conv3d(out_features, out_features, kernel_size, padding=padding, bias=False),
                     BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
                 )
             )
