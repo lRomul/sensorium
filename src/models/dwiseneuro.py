@@ -196,22 +196,19 @@ class BehaviorNet(nn.Module):
         super().__init__()
         self.stem = nn.Sequential(
             nn.Conv3d(behavior_features, out_features, (1, 1, 1), bias=False),
-            BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, apply_act=False),
+            BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
         )
         kernel_size = (temporal_kernel, spatial_kernel, spatial_kernel)
         padding = (temporal_kernel // 2, spatial_kernel // 2, spatial_kernel // 2)
         self.upsample = nn.Sequential()
-        for index_upsample, scale_factor in enumerate(scale_factors):
-            upsample_act_layer = act_layer
-            if index_upsample == len(scale_factors) - 1:
-                upsample_act_layer = nn.Sigmoid
+        for scale_factor in scale_factors:
             self.upsample.append(
                 nn.Sequential(
                     nn.Upsample(scale_factor=(1, scale_factor, scale_factor), mode="nearest"),
                     PositionalEncoding3d(out_features),
                     nn.Conv3d(out_features, out_features, kernel_size,
                               padding=padding, groups=out_features, bias=False),
-                    BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=upsample_act_layer),
+                    BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
                 )
             )
         self.drop_path = DropPath(drop_prob=drop_path_rate)
@@ -219,7 +216,7 @@ class BehaviorNet(nn.Module):
     def forward(self, x, behavior):
         behavior = self.stem(behavior.unsqueeze(-1).unsqueeze(-1))
         behavior = self.upsample(behavior)
-        x = x * self.drop_path(behavior)
+        x = x + self.drop_path(behavior)
         return x
 
 
