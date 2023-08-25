@@ -188,7 +188,7 @@ class BehaviorNet(nn.Module):
     def __init__(self,
                  behavior_features: int,
                  out_features: int,
-                 scale_factors: tuple[int, ...] = (2, 2, 2),
+                 in_spatial_size: int = 8,
                  spatial_kernel: int = 3,
                  temporal_kernel: int = 5,
                  act_layer: Callable = nn.ReLU,
@@ -200,12 +200,22 @@ class BehaviorNet(nn.Module):
         )
         kernel_size = (temporal_kernel, spatial_kernel, spatial_kernel)
         padding = (temporal_kernel // 2, spatial_kernel // 2, spatial_kernel // 2)
-        self.upsample = nn.Sequential()
-        for scale_factor in scale_factors:
-            self.upsample.append(
+        num_upsamples = math.log2(in_spatial_size)
+        assert num_upsamples.is_integer()
+        self.upsamples = nn.ModuleList()
+        self.pools = nn.ModuleList()
+        self.convs = nn.ModuleList()
+        for upsample_index in range(int(num_upsamples)):
+            self.upsamples.append(
                 nn.Sequential(
-                    nn.Upsample(scale_factor=(1, scale_factor, scale_factor), mode="nearest"),
+                    nn.Upsample(scale_factor=(1, 2, 2), mode="nearest"),
                     PositionalEncoding3d(out_features),
+                )
+            )
+            spatial_size = 2 ** (upsample_index + 1)
+            self.pools.append(nn.AdaptiveAvgPool3d((None, spatial_size, spatial_size)))
+            self.convs.append(
+                nn.Sequential(
                     nn.Conv3d(out_features, out_features, kernel_size,
                               padding=padding, groups=out_features, bias=False),
                     BatchNormAct(out_features, bn_layer=nn.BatchNorm3d, act_layer=act_layer),
@@ -215,9 +225,11 @@ class BehaviorNet(nn.Module):
 
     def forward(self, x, behavior):
         behavior = self.stem(behavior.unsqueeze(-1).unsqueeze(-1))
-        behavior = self.upsample(behavior)
-        x = x + self.drop_path(behavior)
-        return x
+        for upsample, pool, conv in zip(self.upsamples, self.pools, self.convs):
+            behavior = upsample(behavior)
+            behavior = pool(x) + behavior
+            behavior = conv(behavior)
+        return x + self.drop_path(behavior)
 
 
 class Readout(nn.Module):
