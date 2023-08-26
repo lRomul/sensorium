@@ -16,6 +16,7 @@ from argus.callbacks import (
 )
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset, ConcatMiceVideoDataset
+from src.duplicates import TrainDuplicatesMiceVideoDataset
 from src.responses import get_responses_processor
 from src.ema import ModelEma, EmaCheckpoint
 from src.inputs import get_inputs_processor
@@ -68,7 +69,11 @@ def train_mouse(config: dict, save_dir: Path):
                 mixup=mixup,
             )
         ]
-    train_dataset = ConcatMiceVideoDataset(train_datasets)
+    assert mixup is None  # TODO: MixUp support for TrainDuplicatesMiceVideoDataset
+    train_dataset = TrainDuplicatesMiceVideoDataset(
+        train_datasets,
+        **config["duplicates_dataset"],
+    )
     print("Train dataset len:", len(train_dataset))
     val_datasets = []
     for mouse in constants.mice:
