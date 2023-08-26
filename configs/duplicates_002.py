@@ -18,7 +18,7 @@ config = dict(
     num_dataloader_workers=8,
     init_weights=True,
     duplicates_dataset={
-        "duplicate_weight": 1.0,
+        "duplicate_weight": 0.5,
         "num_hash_frames": 5,
     },
     argus_params={
