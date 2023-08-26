@@ -17,6 +17,10 @@ config = dict(
     stages=["warmup", "train"],
     num_dataloader_workers=8,
     init_weights=True,
+    duplicates_dataset={
+        "duplicate_weight": 1.0,
+        "num_hash_frames": 5,
+    },
     argus_params={
         "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
@@ -61,6 +65,6 @@ config = dict(
     },
     mixup={
         "alpha": 0.4,
-        "prob": 0.5,
+        "prob": 0.0,
     },
 )
