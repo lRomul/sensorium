@@ -8,7 +8,6 @@ from torch import nn
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from src.mixup import Mixup
 from src.data import get_mouse_data
 from src.utils import set_random_seed
 from src.inputs import InputsProcessor
@@ -96,12 +95,10 @@ class TrainMouseVideoDataset(MouseVideoDataset):
                  inputs_processor: InputsProcessor,
                  responses_processor: ResponsesProcessor,
                  epoch_size: int,
-                 augmentations: nn.Module | None = None,
-                 mixup: Mixup | None = None):
+                 augmentations: nn.Module | None = None):
         super().__init__(mouse, "train", indexes_generator, inputs_processor, responses_processor)
         self.epoch_size = epoch_size
         self.augmentations = augmentations
-        self.mixup = mixup
 
     def __len__(self) -> int:
         return self.epoch_size
@@ -122,20 +119,6 @@ class TrainMouseVideoDataset(MouseVideoDataset):
         if self.augmentations is not None:
             frames = self.augmentations(frames[None])[0]
         return frames, responses
-
-    def mixup_sample(self, sample: tuple[Tensor, Tensor]) -> tuple[Tensor, Tensor]:
-        if self.mixup is None or not self.mixup.use():
-            return sample
-        random_trial_index, random_indexes = self.get_indexes(random.randrange(self.epoch_size))
-        random_sample = self.get_sample_tensors(random_trial_index, random_indexes)
-        sample = self.mixup(sample, random_sample)
-        return sample
-
-    def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
-        trial_index, indexes = self.get_indexes(index)
-        sample = self.get_sample_tensors(trial_index, indexes)
-        sample = self.mixup_sample(sample)
-        return sample
 
 
 class ValMouseVideoDataset(MouseVideoDataset):

@@ -55,7 +55,6 @@ def train_mouse(config: dict, save_dir: Path):
     inputs_processor = get_inputs_processor(*argus_params["inputs_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
 
-    mixup = Mixup(**config["mixup"]) if config["mixup"]["prob"] else None
     train_datasets = []
     mouse_epoch_size = config["train_epoch_size"] // constants.num_mice
     for mouse in constants.mice:
@@ -66,12 +65,11 @@ def train_mouse(config: dict, save_dir: Path):
                 inputs_processor=inputs_processor,
                 responses_processor=responses_processor,
                 epoch_size=mouse_epoch_size,
-                mixup=mixup,
             )
         ]
-    assert mixup is None  # TODO: MixUp support for TrainDuplicatesMiceVideoDataset
     train_dataset = TrainDuplicatesMiceVideoDataset(
         train_datasets,
+        Mixup(**config["mixup"]),
         **config["duplicates_dataset"],
     )
     print("Train dataset len:", len(train_dataset))

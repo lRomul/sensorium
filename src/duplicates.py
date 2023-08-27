@@ -7,6 +7,7 @@ from PIL import Image
 
 from torch import Tensor
 
+from src.mixup import Mixup
 from src.data import get_length_without_nan
 from src.datasets import MouseVideoDataset, ConcatMiceVideoDataset
 
@@ -27,7 +28,9 @@ def calculate_video_phash(video: np.ndarray, num_hash_frames: int = 5) -> tuple[
     return tuple(frame_hashes)
 
 
-def get_hash_data_dict(mice_data: list[dict], num_hash_frames: int = 5) -> dict[tuple[bool, ...], set[tuple[int, int]]]:
+def get_hash_data_dict(
+        mice_data: list[dict], num_hash_frames: int = 5
+) -> dict[tuple[bool, ...], set[tuple[int, int]]]:
     hash_data_dict = defaultdict(set)
     for mouse_index, mouse_data in enumerate(mice_data):
         for trial_index, trial_data in enumerate(mouse_data["trials"]):
@@ -37,7 +40,9 @@ def get_hash_data_dict(mice_data: list[dict], num_hash_frames: int = 5) -> dict[
     return dict(hash_data_dict)
 
 
-def get_trial2duplicate(mice_data: list[dict], num_hash_frames: int = 5) -> dict[tuple[int, int], set[tuple[int, int]]]:
+def get_trial2duplicate(
+        mice_data: list[dict], num_hash_frames: int = 5
+) -> dict[tuple[int, int], set[tuple[int, int]]]:
     hash_data_dict = get_hash_data_dict(mice_data, num_hash_frames=num_hash_frames)
     trial2duplicate: dict[tuple[int, int], set[tuple[int, int]]] = dict()
     for video_phash, trials_set in hash_data_dict.items():
@@ -49,27 +54,48 @@ def get_trial2duplicate(mice_data: list[dict], num_hash_frames: int = 5) -> dict
 class TrainDuplicatesMiceVideoDataset(ConcatMiceVideoDataset):
     def __init__(self,
                  mice_datasets: list[MouseVideoDataset],
+                 mixup: Mixup,
                  duplicate_weight: float = 1.0,
                  num_hash_frames: int = 5):
         super().__init__(mice_datasets=mice_datasets)
+        self.mixup = mixup
+        self.duplicate_weight = duplicate_weight
         self.trial2duplicate = get_trial2duplicate(
             [mouse_dataset.mouse_data for mouse_dataset in self.mice_datasets],
             num_hash_frames=num_hash_frames,
         )
-        self.duplicate_weight = duplicate_weight
 
     def __getitem__(self, index: int) -> tuple[Tensor, tuple[list[Tensor], Tensor]]:
         mouse_index = random.randrange(len(self.mice_datasets))
-        trial_index, indexes = self.mice_datasets[mouse_index].get_indexes(index)
-        mouse_sample = self.mice_datasets[mouse_index].get_sample_tensors(trial_index, indexes)
+        dataset = self.mice_datasets[mouse_index]
+        trial_index, indexes = dataset.get_indexes(index)
+        mouse_sample = dataset.get_sample_tensors(trial_index, indexes)
+
+        use_mixup = self.mixup.use()
+        if use_mixup:
+            rnd_trial_index, rnd_indexes = dataset.get_indexes(random.randrange(len(dataset)))
+            rnd_mouse_sample = dataset.get_sample_tensors(rnd_trial_index, rnd_indexes)
+            lam = self.mixup.sample_lam()
+            mouse_sample = self.mixup(mouse_sample, rnd_mouse_sample, lam=lam)
+
         mice_sample = self.construct_mice_sample(mouse_index, mouse_sample)
 
         trial_duplicate_set = self.trial2duplicate[(mouse_index, trial_index)]
         if trial_duplicate_set:
             dupl_mouse_index, dupl_trial_index = random.choice(list(trial_duplicate_set))
-            _, dupl_target_tensor = self.mice_datasets[dupl_mouse_index].get_sample_tensors(dupl_trial_index, indexes)
+            dupl_dataset = self.mice_datasets[dupl_mouse_index]
+            dupl_mouse_sample = dupl_dataset.get_sample_tensors(dupl_trial_index, indexes)
+
+            if use_mixup:
+                rnd_trial_duplicate_set = self.trial2duplicate[(mouse_index, rnd_trial_index)]
+                if rnd_trial_duplicate_set:
+                    dupl_rnd_mouse_index, dupl_rnd_trial_index = random.choice(list(rnd_trial_duplicate_set))
+                    assert dupl_rnd_mouse_index == dupl_mouse_index
+                    dupl_rnd_mouse_sample = dupl_dataset.get_sample_tensors(dupl_rnd_trial_index, rnd_indexes)
+                    dupl_mouse_sample = self.mixup(dupl_mouse_sample, dupl_rnd_mouse_sample, lam=lam)
+
             target_tensors, mice_weights = mice_sample[1]
-            target_tensors[dupl_mouse_index] = dupl_target_tensor
+            target_tensors[dupl_mouse_index] = dupl_mouse_sample[1]
             mice_weights[dupl_mouse_index] = self.duplicate_weight
 
         return mice_sample
