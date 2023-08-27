@@ -12,7 +12,6 @@ from argus.callbacks import (
     LoggingToCSV,
     CosineAnnealingLR,
     Checkpoint,
-    LambdaLR,
 )
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset, ConcatMiceVideoDataset
@@ -96,38 +95,33 @@ def train_mouse(config: dict, save_dir: Path):
         shuffle=False,
     )
 
-    for num_epochs, stage in zip(config["num_epochs"], config["stages"]):
-        callbacks = [
-            LoggingToFile(save_dir / "log.txt", append=True),
-            LoggingToCSV(save_dir / "log.csv", append=True),
-        ]
+    callbacks = [
+        LoggingToFile(save_dir / "log.txt", append=True),
+        LoggingToCSV(save_dir / "log.csv", append=True),
+    ]
 
-        num_iterations = (len(train_dataset) // config["batch_size"]) * num_epochs
-        if stage == "warmup":
-            callbacks += [
-                LambdaLR(lambda x: x / num_iterations,
-                         step_on_iteration=True),
-            ]
-        elif stage == "train":
-            checkpoint_format = "model-{epoch:03d}-{val_corr:.6f}.pth"
-            callbacks += [
-                checkpoint_class(save_dir, file_format=checkpoint_format, max_saves=1),
-                CosineAnnealingLR(
-                    T_max=num_iterations,
-                    eta_min=get_lr(config["min_base_lr"], config["batch_size"]),
-                    step_on_iteration=True,
-                ),
-            ]
+    num_epochs = config["num_epochs"]
+    num_iterations = (len(train_dataset) // config["batch_size"]) * num_epochs
 
-        metrics = [
-            CorrelationMetric(),
-        ]
+    checkpoint_format = "model-{epoch:03d}-{val_corr:.6f}.pth"
+    callbacks += [
+        checkpoint_class(save_dir, file_format=checkpoint_format, max_saves=1),
+        CosineAnnealingLR(
+            T_max=num_iterations,
+            eta_min=get_lr(config["min_base_lr"], config["batch_size"]),
+            step_on_iteration=True,
+        ),
+    ]
 
-        model.fit(train_loader,
-                  val_loader=val_loader,
-                  num_epochs=num_epochs,
-                  callbacks=callbacks,
-                  metrics=metrics)
+    metrics = [
+        CorrelationMetric(),
+    ]
+
+    model.fit(train_loader,
+              val_loader=val_loader,
+              num_epochs=num_epochs,
+              callbacks=callbacks,
+              metrics=metrics)
 
 
 if __name__ == "__main__":

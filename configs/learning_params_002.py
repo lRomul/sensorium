@@ -4,7 +4,7 @@ from src import constants
 
 image_size = (64, 64)
 batch_size = 16
-base_lr = 1e-4
+base_lr = 3e-4
 frame_stack_size = 16
 config = dict(
     image_size=image_size,
@@ -13,8 +13,7 @@ config = dict(
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
     train_epoch_size=45000,
-    num_epochs=[3, 18],
-    stages=["warmup", "train"],
+    num_epochs=21,
     num_dataloader_workers=8,
     init_weights=True,
     argus_params={
