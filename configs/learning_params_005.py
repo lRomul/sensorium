@@ -12,7 +12,7 @@ config = dict(
     base_lr=base_lr,
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
-    train_epoch_size=54000,
+    train_epoch_size=45000,
     num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=8,
@@ -48,7 +48,7 @@ config = dict(
         "device": "cuda:0",
         "frame_stack": {
             "size": frame_stack_size,
-            "step": 2,
+            "step": 3,
             "position": "last",
         },
         "inputs_processor": ("stack_inputs", {
