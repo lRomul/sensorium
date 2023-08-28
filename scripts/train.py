@@ -68,7 +68,10 @@ def train_mouse(config: dict, save_dir: Path):
                 mixup=mixup,
             )
         ]
-    train_dataset = ConcatMiceVideoDataset(train_datasets)
+    train_dataset = ConcatMiceVideoDataset(
+        train_datasets,
+        mice_weights=config["train_mice_weights"],
+    )
     print("Train dataset len:", len(train_dataset))
     val_datasets = []
     for mouse in constants.mice:

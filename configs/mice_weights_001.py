@@ -63,4 +63,5 @@ config = dict(
         "alpha": 0.4,
         "prob": 0.5,
     },
+    train_mice_weights=[1.0] * constants.num_new_mice + [0.75] * constants.num_old_mice,
 )
