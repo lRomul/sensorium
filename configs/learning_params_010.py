@@ -3,7 +3,7 @@ from src import constants
 
 
 image_size = (64, 64)
-batch_size = 48
+batch_size = 64
 base_lr = 3e-4
 frame_stack_size = 16
 config = dict(
@@ -57,7 +57,7 @@ config = dict(
         }),
         "responses_processor": ("identity", {}),
         "amp": True,
-        "iter_size": 3,
+        "iter_size": 4,
     },
     mixup={
         "alpha": 0.4,
