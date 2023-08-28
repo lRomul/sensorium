@@ -4,7 +4,7 @@ from src import constants
 
 image_size = (64, 64)
 batch_size = 16
-base_lr = 3e-4
+base_lr = 1e-3
 frame_stack_size = 16
 config = dict(
     image_size=image_size,
@@ -48,7 +48,7 @@ config = dict(
         "device": "cuda:0",
         "frame_stack": {
             "size": frame_stack_size,
-            "step": 3,
+            "step": 2,
             "position": "last",
         },
         "inputs_processor": ("stack_inputs", {
