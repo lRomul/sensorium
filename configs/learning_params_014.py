@@ -3,7 +3,7 @@ from src import constants
 
 
 image_size = (64, 64)
-batch_size = 32
+batch_size = 48
 base_lr = 3e-4
 frame_stack_size = 16
 config = dict(
@@ -12,7 +12,7 @@ config = dict(
     base_lr=base_lr,
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
-    train_epoch_size=72000,
+    train_epoch_size=45000,
     num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=8,
@@ -57,7 +57,7 @@ config = dict(
         }),
         "responses_processor": ("identity", {}),
         "amp": True,
-        "iter_size": 2,
+        "iter_size": 3,
     },
     mixup={
         "alpha": 0.4,
