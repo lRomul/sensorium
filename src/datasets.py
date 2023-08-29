@@ -119,7 +119,7 @@ class TrainMouseVideoDataset(MouseVideoDataset):
     def get_sample_tensors(self, index: int) -> tuple[Tensor, Tensor]:
         frames, responses = super().get_sample_tensors(index)
         if self.augmentations is not None:
-            frames = self.augmentations(frames[None])[0]
+            frames = self.augmentations(frames)
         return frames, responses
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
