@@ -4,7 +4,7 @@ from src import constants
 
 image_size = (64, 64)
 batch_size = 32
-base_lr = 3e-4
+base_lr = 2e-4
 frame_stack_size = 16
 config = dict(
     image_size=image_size,
