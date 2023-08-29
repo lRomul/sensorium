@@ -91,7 +91,7 @@ def train_mouse(config: dict, save_dir: Path):
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=config["batch_size"],
+        batch_size=config["batch_size"] // argus_params["iter_size"],
         num_workers=config["num_dataloader_workers"],
         shuffle=False,
     )

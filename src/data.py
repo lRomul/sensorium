@@ -11,7 +11,7 @@ def get_length_without_nan(array: np.ndarray):
         return array.shape[0]
 
 
-def get_mouse_data(mouse: str, split: str):
+def get_mouse_data(mouse: str, split: str) -> dict:
     assert mouse in constants.mice
     if split in constants.labeled_splits:
         labeled_split = True

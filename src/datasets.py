@@ -5,6 +5,7 @@ import numpy as np
 
 import torch
 from torch import nn
+from torch import Tensor
 from torch.utils.data import Dataset
 
 from src.mixup import Mixup
@@ -65,7 +66,7 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
                                  frames: np.ndarray,
                                  behavior: np.ndarray,
                                  pupil_center: np.ndarray,
-                                 responses: np.ndarray) -> tuple[torch.Tensor, torch.Tensor]:
+                                 responses: np.ndarray) -> tuple[Tensor, Tensor]:
         input_tensor = self.inputs_processor(frames, behavior, pupil_center)
         target_tensor = self.responses_processor(responses)
         return input_tensor, target_tensor
@@ -78,12 +79,12 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
     def get_indexes(self, index: int) -> tuple[int, list[int]]:
         pass
 
-    def get_sample_tensors(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_sample_tensors(self, index: int) -> tuple[Tensor, Tensor]:
         trial_index, indexes = self.get_indexes(index)
         frames, behavior, pupil_center, responses = self.get_inputs_responses(trial_index, indexes)
         return self.process_inputs_responses(frames, behavior, pupil_center, responses)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
         return self.get_sample_tensors(index)
 
 
@@ -115,13 +116,13 @@ class TrainMouseVideoDataset(MouseVideoDataset):
         indexes = self.indexes_generator.make_indexes(frame_index)
         return trial_index, indexes
 
-    def get_sample_tensors(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_sample_tensors(self, index: int) -> tuple[Tensor, Tensor]:
         frames, responses = super().get_sample_tensors(index)
         if self.augmentations is not None:
             frames = self.augmentations(frames[None])[0]
         return frames, responses
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
         sample = self.get_sample_tensors(index)
         if self.mixup is not None and self.mixup.use():
             random_sample = self.get_sample_tensors(index + 1)
@@ -160,7 +161,8 @@ class ValMouseVideoDataset(MouseVideoDataset):
 
 class ConcatMiceVideoDataset(Dataset):
     def __init__(self, mice_datasets: list[MouseVideoDataset]):
-        assert [d.mouse_index for d in mice_datasets] == constants.mice_indexes
+        self.mice_indexes = [d.mouse_index for d in mice_datasets]
+        assert self.mice_indexes == constants.mice_indexes
         self.mice_datasets = mice_datasets
         self.samples_per_dataset = [len(d) for d in mice_datasets]
         self.num_samples = sum(self.samples_per_dataset)
@@ -168,18 +170,12 @@ class ConcatMiceVideoDataset(Dataset):
     def __len__(self):
         return self.num_samples
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, tuple[list[torch.Tensor], torch.Tensor]]:
-        assert 0 <= index < self.__len__()
-        sample_index = index
-        mouse_index = 0
-        for mouse_index, num_trial_samples in enumerate(self.samples_per_dataset):
-            if sample_index >= num_trial_samples:
-                sample_index -= num_trial_samples
-            else:
-                break
-        input_tensor, target_tensor = self.mice_datasets[mouse_index][sample_index]
+    def construct_mice_sample(
+            self, mouse_index: int, mouse_sample: tuple[Tensor, Tensor]
+    ) -> tuple[Tensor, tuple[list[Tensor], Tensor]]:
+        input_tensor, target_tensor = mouse_sample
         target_tensors = []
-        for index in constants.mice_indexes:
+        for index in self.mice_indexes:
             if index == mouse_index:
                 target_tensors.append(target_tensor)
             else:
@@ -190,3 +186,16 @@ class ConcatMiceVideoDataset(Dataset):
         mice_weights = torch.zeros(constants.num_mice, dtype=torch.float32)
         mice_weights[mouse_index] = 1.0
         return input_tensor, (target_tensors, mice_weights)
+
+    def __getitem__(self, index: int) -> tuple[Tensor, tuple[list[Tensor], Tensor]]:
+        assert 0 <= index < self.__len__()
+        sample_index = index
+        mouse_index = 0
+        for mouse_index, num_trial_samples in enumerate(self.samples_per_dataset):
+            if sample_index >= num_trial_samples:
+                sample_index -= num_trial_samples
+            else:
+                break
+        mouse_sample = self.mice_datasets[mouse_index][sample_index]
+        mice_sample = self.construct_mice_sample(mouse_index, mouse_sample)
+        return mice_sample
