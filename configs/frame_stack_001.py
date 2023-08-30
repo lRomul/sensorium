@@ -48,7 +48,7 @@ config = dict(
         "device": "cuda:0",
         "frame_stack": {
             "size": frame_stack_size,
-            "step": 2,
+            "step": 4,
             "position": "last",
         },
         "inputs_processor": ("stack_inputs", {
