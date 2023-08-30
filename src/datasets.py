@@ -9,7 +9,6 @@ from torch import Tensor
 from torch.utils.data import Dataset
 
 from src.mixup import Mixup
-from src.data import get_mouse_data
 from src.utils import set_random_seed
 from src.inputs import InputsProcessor
 from src.indexes import IndexesGenerator
@@ -19,13 +18,13 @@ from src import constants
 
 class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
     def __init__(self,
-                 mouse: str, split: str,
+                 mouse_data: dict,
                  indexes_generator: IndexesGenerator,
                  inputs_processor: InputsProcessor,
                  responses_processor: ResponsesProcessor):
-        self.mouse = mouse
-        self.mouse_index = constants.mouse2index[mouse]
-        self.mouse_data = get_mouse_data(mouse=mouse, split=split)
+        self.mouse_data = mouse_data
+        self.mouse = mouse_data["mouse"]
+        self.mouse_index = constants.mouse2index[self.mouse]
         self.indexes_generator = indexes_generator
         self.inputs_processor = inputs_processor
         self.responses_processor = responses_processor
@@ -90,14 +89,14 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
 
 class TrainMouseVideoDataset(MouseVideoDataset):
     def __init__(self,
-                 mouse: str,
+                 mouse_data: dict,
                  indexes_generator: IndexesGenerator,
                  inputs_processor: InputsProcessor,
                  responses_processor: ResponsesProcessor,
                  epoch_size: int,
                  augmentations: nn.Module | None = None,
                  mixup: Mixup | None = None):
-        super().__init__(mouse, "train", indexes_generator, inputs_processor, responses_processor)
+        super().__init__(mouse_data, indexes_generator, inputs_processor, responses_processor)
         self.epoch_size = epoch_size
         self.augmentations = augmentations
         self.mixup = mixup
@@ -132,11 +131,11 @@ class TrainMouseVideoDataset(MouseVideoDataset):
 
 class ValMouseVideoDataset(MouseVideoDataset):
     def __init__(self,
-                 mouse: str,
+                 mouse_data: dict,
                  indexes_generator: IndexesGenerator,
                  inputs_processor: InputsProcessor,
                  responses_processor: ResponsesProcessor):
-        super().__init__(mouse, "val", indexes_generator, inputs_processor, responses_processor)
+        super().__init__(mouse_data, indexes_generator, inputs_processor, responses_processor)
         self.window_size = self.indexes_generator.width
         self.samples_per_trials = [length // self.window_size for length in self.trials_lengths]
         self.num_samples = sum(self.samples_per_trials)

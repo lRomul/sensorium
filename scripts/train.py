@@ -23,6 +23,7 @@ from src.utils import get_lr, init_weights
 from src.metrics import CorrelationMetric
 from src.indexes import IndexesGenerator
 from src.argus_models import MouseModel
+from src.data import get_mouse_data
 from src.mixup import Mixup
 from src import constants
 
@@ -30,10 +31,11 @@ from src import constants
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--experiment", required=True, type=str)
+    parser.add_argument("-f", "--folds", default="all", type=str)
     return parser.parse_args()
 
 
-def train_mouse(config: dict, save_dir: Path):
+def train_mouse(config: dict, save_dir: Path, train_splits: list[str], val_splits: list[str]):
     config = copy.deepcopy(config)
     argus_params = config["argus_params"]
 
@@ -60,7 +62,7 @@ def train_mouse(config: dict, save_dir: Path):
     for mouse in constants.mice:
         train_datasets += [
             TrainMouseVideoDataset(
-                mouse=mouse,
+                mouse_data=get_mouse_data(mouse=mouse, splits=train_splits),
                 indexes_generator=indexes_generator,
                 inputs_processor=inputs_processor,
                 responses_processor=responses_processor,
@@ -74,7 +76,7 @@ def train_mouse(config: dict, save_dir: Path):
     for mouse in constants.mice:
         val_datasets += [
             ValMouseVideoDataset(
-                mouse=mouse,
+                mouse_data=get_mouse_data(mouse=mouse, splits=val_splits),
                 indexes_generator=indexes_generator,
                 inputs_processor=inputs_processor,
                 responses_processor=responses_processor,
@@ -138,21 +140,34 @@ if __name__ == "__main__":
     if not config_path.exists():
         raise RuntimeError(f"Config '{config_path}' is not exists")
 
-    config = SourceFileLoader(args.experiment, str(config_path)).load_module().config
+    train_config = SourceFileLoader(args.experiment, str(config_path)).load_module().config
     print("Experiment config:")
-    pprint(config, sort_dicts=False)
+    pprint(train_config, sort_dicts=False)
 
-    experiments_dir = constants.experiments_dir / args.experiment
-    print("Experiment dir:", experiments_dir)
-    if not experiments_dir.exists():
-        experiments_dir.mkdir(parents=True, exist_ok=True)
+    experiment_dir = constants.experiments_dir / args.experiment
+    print("Experiment dir:", experiment_dir)
+    if not experiment_dir.exists():
+        experiment_dir.mkdir(parents=True, exist_ok=True)
     else:
-        print(f"Folder '{experiments_dir}' already exists.")
+        print(f"Folder '{experiment_dir}' already exists.")
 
-    with open(experiments_dir / "train.py", "w") as outfile:
+    with open(experiment_dir / "train.py", "w") as outfile:
         outfile.write(open(__file__).read())
 
-    with open(experiments_dir / "config.json", "w") as outfile:
-        json.dump(config, outfile, indent=4)
+    with open(experiment_dir / "config.json", "w") as outfile:
+        json.dump(train_config, outfile, indent=4)
 
-    train_mouse(config, experiments_dir)
+    if args.folds == "all":
+        folds_splits = constants.folds_splits
+    else:
+        folds_splits = [f"fold_{fold}" for fold in args.folds.split(",")]
+
+    for fold_split in folds_splits:
+        fold_experiment_dir = experiment_dir / fold_split
+
+        val_folds_splits = [fold_split]
+        train_folds_splits = sorted(set(constants.folds_splits) - set(val_folds_splits))
+
+        print(f"Val fold: {val_folds_splits}, train folds: {train_folds_splits}")
+        print(f"Fold experiment dir: {fold_experiment_dir}")
+        train_mouse(train_config, fold_experiment_dir, train_folds_splits, val_folds_splits)

@@ -43,8 +43,11 @@ mouse2index: dict[str, int] = {mouse: index for index, mouse in enumerate(mice)}
 mouse2num_neurons: dict[str, int] = {mouse: num for mouse, num in zip(mice, num_neurons)}
 mice_indexes = list(range(num_mice))
 
-labeled_splits = ["train", "val"]
 unlabeled_splits = ["live_test_main", "live_test_bonus", "final_test_main", "final_test_bonus"]
+
+num_folds = 7
+folds = list(range(num_folds))
+folds_splits = [f"fold_{fold}" for fold in folds]
 
 submission_skip_first = 50
 submission_skip_last = 1
