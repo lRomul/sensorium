@@ -63,4 +63,7 @@ config = dict(
         "alpha": 0.4,
         "prob": 0.5,
     },
+    augmentations=("stack_inputs", {
+        "size": image_size,
+    }),
 )

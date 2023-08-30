@@ -16,8 +16,8 @@ from argus.callbacks import (
 )
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset, ConcatMiceVideoDataset
-from src.augmentations import get_train_augmentations
 from src.responses import get_responses_processor
+from src.augmentations import get_augmentations
 from src.ema import ModelEma, EmaCheckpoint
 from src.inputs import get_inputs_processor
 from src.utils import get_lr, init_weights
@@ -54,7 +54,7 @@ def train_mouse(config: dict, save_dir: Path):
     indexes_generator = IndexesGenerator(**argus_params["frame_stack"])
     inputs_processor = get_inputs_processor(*argus_params["inputs_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
-    augmentations = get_train_augmentations(size=config["image_size"])
+    augmentations = get_augmentations(*config["augmentations"])
 
     mixup = Mixup(**config["mixup"]) if config["mixup"]["prob"] else None
     train_datasets = []
