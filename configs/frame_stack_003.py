@@ -3,16 +3,16 @@ from src import constants
 
 
 image_size = (64, 64)
-batch_size = 33
+batch_size = 32
 base_lr = 3e-4
-frame_stack_size = 20
+frame_stack_size = 16
 config = dict(
     image_size=image_size,
     batch_size=batch_size,
     base_lr=base_lr,
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
-    train_epoch_size=48000,
+    train_epoch_size=64000,
     num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=8,
@@ -48,7 +48,7 @@ config = dict(
         "device": "cuda:0",
         "frame_stack": {
             "size": frame_stack_size,
-            "step": 2,
+            "step": 5,
             "position": "last",
         },
         "inputs_processor": ("stack_inputs", {
@@ -57,7 +57,7 @@ config = dict(
         }),
         "responses_processor": ("identity", {}),
         "amp": True,
-        "iter_size": 3,
+        "iter_size": 2,
     },
     mixup={
         "alpha": 0.4,
