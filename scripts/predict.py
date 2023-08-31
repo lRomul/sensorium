@@ -66,15 +66,15 @@ def predict_folds(experiment: str, dataset: str, device: str):
 
 def predict_unlabeled_split(experiment: str, split: str, dataset: str, device: str):
     print(f"Predict unlabeled split: {experiment=}, {split=}, {dataset=}, {device=}")
+    predictors = []
+    for fold_split in constants.folds_splits:
+        model_path = get_best_model_path(constants.experiments_dir / experiment / fold_split)
+        print("Model path:", str(model_path))
+        predictor = Predictor(model_path=model_path, device=device, blend_weights="ones")
+        predictors.append(predictor)
     for mouse in constants.dataset2mice[dataset]:
         mouse_prediction_dir = constants.predictions_dir / experiment / split / mouse
         mouse_prediction_dir.mkdir(parents=True, exist_ok=True)
-        predictors = []
-        for fold_split in constants.folds_splits:
-            model_path = get_best_model_path(constants.experiments_dir / experiment / fold_split)
-            print("Model path:", str(model_path))
-            predictor = Predictor(model_path=model_path, device=device, blend_weights="ones")
-            predictors.append(predictor)
         predict_mouse_split(mouse, split, predictors, mouse_prediction_dir)
 
 
