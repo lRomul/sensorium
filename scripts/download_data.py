@@ -3,6 +3,8 @@ import zipfile
 import argparse
 from pathlib import Path
 
+import deeplake
+import numpy as np
 import requests
 from tqdm import tqdm
 
@@ -47,3 +49,13 @@ if __name__ == "__main__":
         print("Delete", zip_path)
         zip_path.unlink()
         shutil.rmtree(sensorium_dir / "__MACOSX", ignore_errors=True)
+
+        if mouse in constants.new_mice:
+            continue
+        for split in constants.unlabeled_splits:
+            dataset = deeplake.load(f"hub://sinzlab/Sensorium_2023_{mouse}_{split}")
+            trials_ids = dataset.id.numpy().astype(int).ravel().tolist()
+            for index, trial_id in enumerate(trials_ids):
+                responses_path = mouse_dir / "data" / "responses" / f"{trial_id}.npy"
+                responses = dataset.responses[index].numpy()
+                np.save(str(responses_path), responses)
