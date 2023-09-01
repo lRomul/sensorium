@@ -144,6 +144,6 @@ if __name__ == "__main__":
     if args.split == "folds":
         predict_folds(args.experiment, args.dataset, args.device)
         evaluate_folds_predictions(args.experiment, args.dataset)
-    else:
+    elif args.dataset == "new":
         predict_unlabeled_split(args.experiment, args.split, args.dataset, args.device)
         make_submission(args.experiment, args.split)
