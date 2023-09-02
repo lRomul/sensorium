@@ -5,6 +5,8 @@ from typing import Callable
 import torch
 from torch import nn
 
+from src.models.attention import MultiHeadedSelfAttentionModule
+
 
 class BatchNormAct(nn.Module):
     def __init__(self,
@@ -189,12 +191,16 @@ class Readout(nn.Module):
                  in_features: int,
                  hidden_features: int,
                  out_features: int,
+                 attn_heads: int = 4,
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
                  drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
         self.groups = groups
+        self.attention = MultiHeadedSelfAttentionModule(
+            in_features, num_heads=attn_heads, dropout_p=drop_rate / 2.
+        )
         self.layer1 = nn.Sequential(
             nn.Dropout1d(p=drop_rate / 2.),
             nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
@@ -209,6 +215,7 @@ class Readout(nn.Module):
         self.gate = nn.Softplus()
 
     def forward(self, x):
+        x = x + self.attention(x)
         x = self.layer1(x)
 
         if self.groups > 1:
@@ -235,6 +242,7 @@ class DwiseNeuro(nn.Module):
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  readout_features: int = 4096,
+                 readout_attn_heads: int = 4,
                  readout_groups: int = 4,
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
@@ -280,7 +288,8 @@ class DwiseNeuro(nn.Module):
         for readout_output in readout_outputs:
             self.readouts += [
                 Readout(next_num_features, readout_features, readout_output,
-                        groups=readout_groups, act_layer=act_layer, drop_rate=drop_rate)
+                        attn_heads=readout_attn_heads, groups=readout_groups,
+                        act_layer=act_layer, drop_rate=drop_rate)
             ]
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:

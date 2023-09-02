@@ -32,6 +32,7 @@ config = dict(
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
+            "readout_attn_heads": 4,
             "readout_groups": 4,
             "drop_rate": 0.2,
             "drop_path_rate": 0.2,
