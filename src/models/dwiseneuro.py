@@ -247,6 +247,7 @@ class DwiseNeuro(nn.Module):
         self.stem = nn.Sequential(
             nn.Conv3d(in_channels, next_num_features, (1, 1, 1), bias=False),
             BatchNormAct(next_num_features, bn_layer=nn.BatchNorm3d, apply_act=False),
+            PositionalEncoding3d(next_num_features),
         )
 
         blocks = []
@@ -258,7 +259,6 @@ class DwiseNeuro(nn.Module):
             block_drop_path_rate = drop_path_rate * block_index / len(features)
 
             blocks += [
-                PositionalEncoding3d(num_features),
                 InvertedResidual3d(
                     num_features,
                     next_num_features,
