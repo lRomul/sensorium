@@ -1,26 +1,32 @@
 import numpy as np
 
+from src.phash import calculate_video_phash
+from src.utils import get_length_without_nan
 from src import constants
 
 
-def get_length_without_nan(array: np.ndarray):
-    nan_indexes = np.argwhere(np.isnan(array)).ravel()
-    if nan_indexes.shape[0]:
-        return nan_indexes[0]
-    else:
-        return array.shape[0]
+def create_videos_phashes(mouse: str) -> np.ndarray:
+    mouse_dir = constants.sensorium_dir / mouse
+    tiers = np.load(str(mouse_dir / "meta" / "trials" / "tiers.npy"))
+    phashes = np.zeros(tiers.shape[0], dtype=np.uint64)
+    for trial_id, tier in enumerate(tiers):
+        if tier == "none":
+            continue
+        video = np.load(str(mouse_dir / "data" / "videos" / f"{trial_id}.npy"))
+        phashes[trial_id] = calculate_video_phash(video)
+    return phashes
 
 
 def get_folds_tiers(mouse: str, num_folds: int):
     tiers = np.load(str(constants.sensorium_dir / mouse / "meta" / "trials" / "tiers.npy"))
+    phashes = create_videos_phashes(mouse)
     if mouse in constants.new_mice:
-        folds_ids = np.argwhere((tiers == "train") | (tiers == "oracle")).ravel()
+        trial_ids = np.argwhere((tiers == "train") | (tiers == "oracle")).ravel()
     else:
-        folds_ids = np.argwhere(tiers != "none").ravel()
-    generator = np.random.default_rng(seed=12)
-    generator.shuffle(folds_ids)
-    for fold, fold_ids in enumerate(np.array_split(folds_ids, num_folds)):
-        tiers[fold_ids] = f"fold_{fold}"
+        trial_ids = np.argwhere(tiers != "none").ravel()
+    for trial_id in trial_ids:
+        fold = int(phashes[trial_id]) % num_folds  # group k-fold by video hash
+        tiers[trial_id] = f"fold_{fold}"
     return tiers
 
 

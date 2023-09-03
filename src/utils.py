@@ -61,3 +61,11 @@ def init_weights(module: nn.Module):
             nn.init.uniform_(m.weight, -init_range, init_range)
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
+
+
+def get_length_without_nan(array: np.ndarray):
+    nan_indexes = np.argwhere(np.isnan(array)).ravel()
+    if nan_indexes.shape[0]:
+        return nan_indexes[0]
+    else:
+        return array.shape[0]
