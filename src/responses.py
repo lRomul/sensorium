@@ -5,6 +5,22 @@ import numpy as np
 
 import torch
 
+from src import constants
+
+
+class ResponseNormalizer:
+    def __init__(self, mouse: str):
+        std = np.load(
+            str(constants.sensorium_dir / mouse / "meta" / "statistics" / "responses" / "all" / "std.npy")
+        )
+        threshold = 0.01 * np.nanmean(std)
+        idx = std > threshold
+        self._response_precision = np.ones_like(std) / threshold
+        self._response_precision[idx] = 1 / std[idx]
+
+    def __call__(self, responses):
+        return responses * self._response_precision[..., :responses.shape[-1]]
+
 
 def responses_to_tensor(responses: np.ndarray) -> torch.Tensor:
     responses = responses.astype(np.float32)
