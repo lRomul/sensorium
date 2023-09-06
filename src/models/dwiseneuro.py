@@ -22,25 +22,16 @@ class BatchNormAct(nn.Module):
         return x
 
 
-class SqueezeExcite3d(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 reduce_ratio: int = 16,
-                 act_layer: Callable = nn.ReLU,
-                 gate_layer: Callable = nn.Sigmoid):
+class GRN(nn.Module):
+    def __init__(self, dim):
         super().__init__()
-        rd_channels = in_features // reduce_ratio
-        self.conv_reduce = nn.Conv3d(in_features, rd_channels, (1, 1, 1), bias=True)
-        self.act1 = act_layer()
-        self.conv_expand = nn.Conv3d(rd_channels, in_features, (1, 1, 1), bias=True)
-        self.gate = gate_layer()
+        self.gamma = nn.Parameter(torch.zeros(1, dim, 1, 1, 1))
+        self.beta = nn.Parameter(torch.zeros(1, dim, 1, 1, 1))
 
     def forward(self, x):
-        x_se = x.mean((2, 3, 4), keepdim=True)
-        x_se = self.conv_reduce(x_se)
-        x_se = self.act1(x_se)
-        x_se = self.conv_expand(x_se)
-        return x * self.gate(x_se)
+        gx = torch.norm(x, p=2, dim=(2, 3, 4), keepdim=True)
+        nx = gx / (gx.mean(dim=1, keepdim=True) + 1e-6)
+        return self.gamma * (x * nx) + self.beta + x
 
 
 def drop_path(x, drop_prob: float = 0., training: bool = False, scale_by_keep: bool = True):
@@ -75,7 +66,6 @@ class InvertedResidual3d(nn.Module):
                  temporal_kernel: int = 3,
                  spatial_stride: int = 1,
                  expansion_ratio: int = 3,
-                 se_reduce_ratio: int = 16,
                  act_layer: Callable = nn.ReLU,
                  drop_path_rate: float = 0.,
                  bias: bool = False):
@@ -108,8 +98,8 @@ class InvertedResidual3d(nn.Module):
             BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
         )
 
-        # Squeeze-and-excitation
-        self.se = SqueezeExcite3d(mid_features, act_layer=act_layer, reduce_ratio=se_reduce_ratio)
+        # Global Response Normalization
+        self.grn = GRN(mid_features)
 
         # Point-wise linear projection
         self.conv_pwl = nn.Sequential(
@@ -130,7 +120,7 @@ class InvertedResidual3d(nn.Module):
         x = self.conv_pw(x)
         x = self.spat_covn_dw(x)
         x = self.temp_covn_dw(x)
-        x = self.se(x)
+        x = self.grn(x)
         x = self.conv_pwl(x)
         x = self.drop_path(x) + self.proj_sc(shortcut)
         return x
@@ -233,7 +223,6 @@ class DwiseNeuro(nn.Module):
                  spatial_kernel: int = 3,
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
-                 se_reduce_ratio: int = 16,
                  readout_features: int = 4096,
                  readout_groups: int = 4,
                  drop_rate: float = 0.,
@@ -266,7 +255,6 @@ class DwiseNeuro(nn.Module):
                     temporal_kernel=temporal_kernel,
                     spatial_stride=spatial_stride,
                     expansion_ratio=expansion_ratio,
-                    se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
                     drop_path_rate=block_drop_path_rate,
                     bias=False,

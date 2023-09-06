@@ -30,7 +30,6 @@ config = dict(
             "spatial_kernel": 3,
             "temporal_kernel": 5,
             "expansion_ratio": 6,
-            "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
             "readout_groups": 4,
             "drop_rate": 0.2,
