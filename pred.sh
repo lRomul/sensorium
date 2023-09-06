@@ -1,6 +1,6 @@
 #!/bin/bash
 
-exp="{$1}"
+exp=${1}
 
 git fetch --all
 git checkout --force "$exp"

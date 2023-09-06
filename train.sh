@@ -1,7 +1,7 @@
 #!/bin/bash
 
-exp="{$1}"
-folds="{$2:-all}"
+exp=${1}
+folds=${2:-all}
 
 git fetch --all
 git checkout --force "$exp"
