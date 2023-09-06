@@ -61,6 +61,6 @@ config = dict(
     },
     mixup={
         "alpha": 0.4,
-        "prob": 0.5,
+        "prob": 0.6,
     },
 )
