@@ -67,7 +67,7 @@ class DropPath(nn.Module):
         return f'drop_prob={round(self.drop_prob,3):0.3f}'
 
 
-class InvertedResidual3d(nn.Module):
+class EdgeResidual3d(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
@@ -84,18 +84,12 @@ class InvertedResidual3d(nn.Module):
         bn_layer = nn.BatchNorm3d
         stride = (1, spatial_stride, spatial_stride)
 
-        # Point-wise expansion
-        self.conv_pw = nn.Sequential(
-            nn.Conv3d(in_features, mid_features, (1, 1, 1), bias=bias),
-            BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
-        )
-
-        # Spatial depth-wise convolution
+        # Spatial expansion convolution
         spatial_padding = spatial_kernel // 2
-        self.spat_covn_dw = nn.Sequential(
-            nn.Conv3d(mid_features, mid_features, (1, spatial_kernel, spatial_kernel),
+        self.spat_covn_exp = nn.Sequential(
+            nn.Conv3d(in_features, mid_features, (1, spatial_kernel, spatial_kernel),
                       stride=stride, padding=(0, spatial_padding, spatial_padding),
-                      groups=mid_features, bias=bias),
+                      groups=1, bias=bias),
             BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
         )
 
@@ -127,8 +121,7 @@ class InvertedResidual3d(nn.Module):
 
     def forward(self, x):
         shortcut = x
-        x = self.conv_pw(x)
-        x = self.spat_covn_dw(x)
+        x = self.spat_covn_exp(x)
         x = self.temp_covn_dw(x)
         x = self.se(x)
         x = self.conv_pwl(x)
@@ -259,7 +252,7 @@ class DwiseNeuro(nn.Module):
 
             blocks += [
                 PositionalEncoding3d(num_features),
-                InvertedResidual3d(
+                EdgeResidual3d(
                     num_features,
                     next_num_features,
                     spatial_kernel=spatial_kernel,
