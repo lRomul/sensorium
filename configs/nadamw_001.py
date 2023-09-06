@@ -41,7 +41,7 @@ config = dict(
             "full": False,
             "eps": 1e-8,
         }),
-        "optimizer": ("AdamW", {
+        "optimizer": ("NAdamW", {
             "lr": get_lr(base_lr, batch_size),
             "weight_decay": 0.05,
         }),
