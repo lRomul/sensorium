@@ -194,10 +194,9 @@ class Readout(nn.Module):
                  drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
-        self.groups = groups
         self.layer1 = nn.Sequential(
             nn.Dropout1d(p=drop_rate / 2.),
-            nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
+            nn.Conv1d(in_features, hidden_features, (1,), groups=1, bias=False),
             BatchNormAct(hidden_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
         )
         self.layer2 = nn.Sequential(
@@ -210,14 +209,6 @@ class Readout(nn.Module):
 
     def forward(self, x):
         x = self.layer1(x)
-
-        if self.groups > 1:
-            # Shuffle channels between groups
-            b, c, t = x.shape
-            x = x.view(b, -1, self.groups, t)
-            x = torch.transpose(x, 1, 2)
-            x = x.reshape(b, -1, t)
-
         x = self.layer2(x)
         x = x[:, :self.out_features]
         x = self.gate(x)
