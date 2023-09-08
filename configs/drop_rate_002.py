@@ -33,7 +33,7 @@ config = dict(
             "se_reduce_ratio": 32,
             "readout_features": 1024 * 8,
             "readout_groups": 4,
-            "drop_rate": 0.3,
+            "drop_rate": 0.1,
             "drop_path_rate": 0.2,
         }),
         "loss": ("mice_poisson", {
