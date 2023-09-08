@@ -1,16 +1,18 @@
 import abc
 import random
+import multiprocessing
 from pathlib import Path
 
 import cv2
 import pandas as pd
+from tqdm import tqdm
 
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
 from src.indexes import IndexesGenerator
-from src.kinetics.frame_fetchers import NvDecFrameFetcher
+from src.kinetics.frame_fetchers import NvDecFrameFetcher, OpencvFrameFetcher
 from src.utils import set_random_seed
 from src.kinetics import constants
 
@@ -26,17 +28,23 @@ def get_video_info(video_path: str | Path) -> dict[str, int | float]:
     return video_info
 
 
+def parse_df_row(row: dict) -> dict:
+    video_name = f"{row['youtube_id']}_{row['time_start']:06}_{row['time_end']:06}.mp4"
+    video_path = constants.kinetics_dir / row["split"] / video_name
+    label = row['label']
+    return {
+        "label": label,
+        "target": constants.class2target[label],
+        "video_path": str(video_path),
+        "video_info": get_video_info(video_path),
+    }
+
+
 def get_videos_data(split: str):
     data_df = pd.read_csv(constants.annotations_dir / f"{split}.csv")
-    videos_data = list()
-    for index, row in data_df.iterrows():
-        video_path = constants.kinetics_dir / split / f"{row.youtube_id}_{row.time_start:06}_{row.time_end:06}.mp4"
-        videos_data.append({
-            "label": row.label,
-            "target": constants.class2target[row.label],
-            "video_path": video_path,
-            "video_info": get_video_info(video_path),
-        })
+    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+        rows = data_df.to_dict('index').values()
+        videos_data = list(tqdm(pool.imap(parse_df_row, rows), total=len(rows)))
     return videos_data
 
 
@@ -59,13 +67,15 @@ class KineticsDataset(Dataset, metaclass=abc.ABCMeta):
                  frame_size: int,
                  channels: int,
                  gpu_id: int = 0):
-        self.videos_data = videos_data
+        self.videos_data = [
+            v for v in videos_data if v["video_info"]["frame_count"] > indexes_generator.width * 2
+        ]
         self.indexes_generator = indexes_generator
         self.frame_size = frame_size
         self.channels = channels
         self.gpu_id = gpu_id
 
-        self.num_videos = len(videos_data)
+        self.num_videos = len(self.videos_data)
 
     @abc.abstractmethod
     def __len__(self) -> int:
@@ -76,8 +86,16 @@ class KineticsDataset(Dataset, metaclass=abc.ABCMeta):
         pass
 
     def get_frames(self, video_index: int, frame_indexes: list[int]) -> Tensor:
-        frame_fetcher = NvDecFrameFetcher(self.videos_data[video_index]["video_path"],
-                                          gpu_id=self.gpu_id)
+        try:
+            frame_fetcher = NvDecFrameFetcher(
+                self.videos_data[video_index]["video_path"],
+                gpu_id=self.gpu_id
+            )
+        except:
+            frame_fetcher = OpencvFrameFetcher(
+                self.videos_data[video_index]["video_path"],
+                gpu_id=self.gpu_id
+            )
         frames = frame_fetcher.fetch_frames(frame_indexes)
         frames = process_frames(frames, size=self.frame_size, channels=self.channels)
         return frames

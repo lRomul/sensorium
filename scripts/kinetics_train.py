@@ -1,0 +1,147 @@
+import copy
+import json
+import argparse
+from pathlib import Path
+from pprint import pprint
+from importlib.machinery import SourceFileLoader
+
+import torch
+from torch.utils.data import DataLoader
+
+from argus.metrics import CategoricalAccuracy
+from argus.callbacks import (
+    LoggingToFile,
+    LoggingToCSV,
+    CosineAnnealingLR,
+    Checkpoint,
+    LambdaLR,
+)
+
+from src.kinetics.datasets import (
+    get_videos_data,
+    TrainKineticsDataset,
+    ValKineticsDataset
+)
+from src.ema import ModelEma, EmaCheckpoint
+from src.utils import get_lr, init_weights
+from src.indexes import IndexesGenerator
+from src.argus_models import MouseModel
+
+from src.constants import configs_dir, experiments_dir
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-e", "--experiment", required=True, type=str)
+    return parser.parse_args()
+
+
+def train_kinetics(config: dict, save_dir: Path):
+    config = copy.deepcopy(config)
+    argus_params = config["argus_params"]
+
+    model = MouseModel(argus_params)
+
+    if config["init_weights"]:
+        print("Weight initialization")
+        init_weights(model.nn_module)
+
+    if config["ema_decay"]:
+        print("EMA decay:", config["ema_decay"])
+        model.model_ema = ModelEma(model.nn_module, decay=config["ema_decay"])
+        checkpoint_class = EmaCheckpoint
+    else:
+        checkpoint_class = Checkpoint
+
+    indexes_generator = IndexesGenerator(**argus_params["frame_stack"])
+    gpu_id = torch.device(argus_params["device"]).index
+    in_channels = argus_params["nn_module"][1]["in_channels"]
+    train_dataset = TrainKineticsDataset(
+        get_videos_data("train"),
+        indexes_generator,
+        frame_size=argus_params["frame_size"],
+        channels=in_channels,
+        epoch_size=config["train_epoch_size"],
+        gpu_id=gpu_id,
+    )
+    print("Train dataset len:", len(train_dataset))
+    val_dataset = ValKineticsDataset(
+        get_videos_data("val"),
+        indexes_generator,
+        frame_size=argus_params["frame_size"],
+        channels=in_channels,
+        gpu_id=gpu_id,
+    )
+    print("Val dataset len:", len(val_dataset))
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config["batch_size"],
+        num_workers=0,
+        shuffle=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config["batch_size"] // argus_params["iter_size"],
+        num_workers=0,
+        shuffle=False,
+    )
+
+    for num_epochs, stage in zip(config["num_epochs"], config["stages"]):
+        callbacks = [
+            LoggingToFile(save_dir / "log.txt", append=True),
+            LoggingToCSV(save_dir / "log.csv", append=True),
+        ]
+
+        num_iterations = (len(train_dataset) // config["batch_size"]) * num_epochs
+        if stage == "warmup":
+            callbacks += [
+                LambdaLR(lambda x: x / num_iterations,
+                         step_on_iteration=True),
+            ]
+        elif stage == "train":
+            checkpoint_format = "model-{epoch:03d}-{val_accuracy:.6f}.pth"
+            callbacks += [
+                checkpoint_class(save_dir, file_format=checkpoint_format, max_saves=1),
+                CosineAnnealingLR(
+                    T_max=num_iterations,
+                    eta_min=get_lr(config["min_base_lr"], config["batch_size"]),
+                    step_on_iteration=True,
+                ),
+            ]
+
+        metrics = [
+            CategoricalAccuracy(),
+        ]
+
+        model.fit(train_loader,
+                  val_loader=val_loader,
+                  num_epochs=num_epochs,
+                  callbacks=callbacks,
+                  metrics=metrics)
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    print("Experiment:", args.experiment)
+
+    config_path = configs_dir / f"{args.experiment}.py"
+    if not config_path.exists():
+        raise RuntimeError(f"Config '{config_path}' is not exists")
+
+    train_config = SourceFileLoader(args.experiment, str(config_path)).load_module().config
+    assert train_config["task"] == "kinetics"
+    print("Experiment config:")
+    pprint(train_config, sort_dicts=False)
+
+    experiments_dir = experiments_dir / args.experiment
+    print("Experiment dir:", experiments_dir)
+    if not experiments_dir.exists():
+        experiments_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        print(f"Folder '{experiments_dir}' already exists.")
+
+    with open(experiments_dir / "config.json", "w") as outfile:
+        json.dump(train_config, outfile, indent=4)
+
+    train_kinetics(train_config, experiments_dir)

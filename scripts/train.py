@@ -141,6 +141,7 @@ if __name__ == "__main__":
         raise RuntimeError(f"Config '{config_path}' is not exists")
 
     train_config = SourceFileLoader(args.experiment, str(config_path)).load_module().config
+    assert train_config["task"] == "sensorium"
     print("Experiment config:")
     pprint(train_config, sort_dicts=False)
 

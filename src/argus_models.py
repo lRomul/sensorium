@@ -8,11 +8,13 @@ from argus.utils import deep_to, deep_detach, deep_chunk
 from src.ema import ModelEma
 from src.losses import MicePoissonLoss
 from src.models.dwiseneuro import DwiseNeuro
+from src.models.dwiseclassifier import DwiseClassifier
 
 
 class MouseModel(argus.Model):
     nn_module = {
         "dwiseneuro": DwiseNeuro,
+        "dwiseclassifier": DwiseClassifier,
     }
     loss = {
         **pytorch_losses,
