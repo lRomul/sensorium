@@ -290,7 +290,7 @@ class DwiseNeuro(nn.Module):
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
-        act_layer = functools.partial(nn.SiLU, inplace=True)
+        act_layer = nn.GELU
 
         self.core = DepthwiseCore(
             in_channels=in_channels,
