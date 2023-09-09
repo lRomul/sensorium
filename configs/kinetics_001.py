@@ -12,7 +12,7 @@ config = dict(
     base_lr=base_lr,
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
-    train_epoch_size=64000,
+    train_epoch_size=128000,
     num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=2,
@@ -37,7 +37,7 @@ config = dict(
         "loss": "CrossEntropyLoss",
         "optimizer": ("AdamW", {
             "lr": get_lr(base_lr, batch_size),
-            "weight_decay": 0.05,
+            "weight_decay": 0.01,
         }),
         "device": "cuda:0",
         "frame_stack": {
