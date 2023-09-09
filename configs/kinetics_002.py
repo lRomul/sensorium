@@ -3,7 +3,7 @@ from src.kinetics import constants
 
 image_size = (64, 64)
 batch_size = 32
-base_lr = 3e-4
+base_lr = 0.001
 frame_stack_size = 16
 config = dict(
     task="kinetics",
@@ -37,7 +37,7 @@ config = dict(
         "loss": "CrossEntropyLoss",
         "optimizer": ("AdamW", {
             "lr": get_lr(base_lr, batch_size),
-            "weight_decay": 0.01,
+            "weight_decay": 0.001,
         }),
         "device": "cuda:0",
         "frame_stack": {
