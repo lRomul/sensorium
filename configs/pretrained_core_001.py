@@ -64,4 +64,5 @@ config = dict(
         "alpha": 0.4,
         "prob": 0.5,
     },
+    pretrained_core="kinetics_001",
 )
