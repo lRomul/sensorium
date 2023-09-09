@@ -1,3 +1,4 @@
+rosny==0.0.6
 tqdm==4.65.0
 requests==2.30.0
 numpy==1.24.3

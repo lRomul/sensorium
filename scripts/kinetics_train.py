@@ -1,12 +1,12 @@
 import copy
 import json
 import argparse
+import multiprocessing
 from pathlib import Path
 from pprint import pprint
 from importlib.machinery import SourceFileLoader
 
 import torch
-from torch.utils.data import DataLoader
 
 from argus.metrics import CategoricalAccuracy
 from argus.callbacks import (
@@ -17,15 +17,16 @@ from argus.callbacks import (
     LambdaLR,
 )
 
+from src.kinetics.data_loader import DataLoader
+from src.ema import ModelEma, EmaCheckpoint
+from src.utils import get_lr, init_weights
+from src.indexes import IndexesGenerator
+from src.argus_models import MouseModel
 from src.kinetics.datasets import (
     get_videos_data,
     TrainKineticsDataset,
     ValKineticsDataset
 )
-from src.ema import ModelEma, EmaCheckpoint
-from src.utils import get_lr, init_weights
-from src.indexes import IndexesGenerator
-from src.argus_models import MouseModel
 
 from src.constants import configs_dir, experiments_dir
 
@@ -77,14 +78,12 @@ def train_kinetics(config: dict, save_dir: Path):
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["batch_size"],
-        num_workers=0,
-        shuffle=True,
+        num_workers=config["num_dataloader_workers"],
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=config["batch_size"] // argus_params["iter_size"],
-        num_workers=0,
-        shuffle=False,
+        num_workers=config["num_dataloader_workers"],
     )
 
     for num_epochs, stage in zip(config["num_epochs"], config["stages"]):
@@ -102,7 +101,7 @@ def train_kinetics(config: dict, save_dir: Path):
         elif stage == "train":
             checkpoint_format = "model-{epoch:03d}-{val_accuracy:.6f}.pth"
             callbacks += [
-                checkpoint_class(save_dir, file_format=checkpoint_format, max_saves=1),
+                checkpoint_class(save_dir, file_format=checkpoint_format),
                 CosineAnnealingLR(
                     T_max=num_iterations,
                     eta_min=get_lr(config["min_base_lr"], config["batch_size"]),
@@ -122,6 +121,7 @@ def train_kinetics(config: dict, save_dir: Path):
 
 
 if __name__ == "__main__":
+    multiprocessing.set_start_method("spawn")
     args = parse_arguments()
     print("Experiment:", args.experiment)
 

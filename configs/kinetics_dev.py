@@ -15,6 +15,7 @@ config = dict(
     train_epoch_size=64000,
     num_epochs=[3, 18],
     stages=["warmup", "train"],
+    num_dataloader_workers=2,
     init_weights=True,
     argus_params={
         "nn_module": ("dwiseclassifier", {
