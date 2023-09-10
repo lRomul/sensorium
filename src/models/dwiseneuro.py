@@ -184,41 +184,50 @@ class PositionalEncoding3d(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
-class Readout(nn.Module):
+class CommonReadout(nn.Module):
     def __init__(self,
                  in_features: int,
-                 hidden_features: int,
                  out_features: int,
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
                  drop_rate: float = 0.):
         super().__init__()
-        self.out_features = out_features
         self.groups = groups
-        self.layer1 = nn.Sequential(
-            nn.Dropout1d(p=drop_rate / 2.),
-            nn.Conv1d(in_features, hidden_features, (1,), groups=groups, bias=False),
-            BatchNormAct(hidden_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-        )
-        self.layer2 = nn.Sequential(
+        self.layer = nn.Sequential(
             nn.Dropout1d(p=drop_rate),
-            nn.Conv1d(hidden_features,
-                      math.ceil(out_features / groups) * groups, (1,),
-                      groups=groups, bias=True),
+            nn.Conv1d(in_features, out_features, (1,), groups=groups, bias=False),
+            BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
         )
-        self.gate = nn.Softplus()
 
     def forward(self, x):
-        x = self.layer1(x)
-
+        x = self.layer(x)
         if self.groups > 1:
             # Shuffle channels between groups
             b, c, t = x.shape
             x = x.view(b, -1, self.groups, t)
             x = torch.transpose(x, 1, 2)
             x = x.reshape(b, -1, t)
+        return x
 
-        x = self.layer2(x)
+
+class Readout(nn.Module):
+    def __init__(self,
+                 in_features: int,
+                 out_features: int,
+                 groups: int = 1,
+                 drop_rate: float = 0.):
+        super().__init__()
+        self.out_features = out_features
+        self.layer = nn.Sequential(
+            nn.Dropout1d(p=drop_rate),
+            nn.Conv1d(in_features,
+                      math.ceil(out_features / groups) * groups, (1,),
+                      groups=groups, bias=True),
+        )
+        self.gate = nn.Softplus()
+
+    def forward(self, x):
+        x = self.layer(x)
         x = x[:, :self.out_features]
         x = self.gate(x)
         return x
@@ -306,16 +315,22 @@ class DwiseNeuro(nn.Module):
 
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
+        self.common_readout = CommonReadout(
+            in_features=features[-1],
+            out_features=readout_features,
+            groups=readout_groups,
+            act_layer=act_layer,
+            drop_rate=drop_rate / 2.,
+        )
+
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts.append(
                 Readout(
-                    in_features=features[-1],
-                    hidden_features=readout_features,
+                    in_features=readout_features,
                     out_features=readout_output,
                     groups=readout_groups,
-                    act_layer=act_layer,
-                    drop_rate=drop_rate
+                    drop_rate=drop_rate,
                 )
             )
 
@@ -323,6 +338,7 @@ class DwiseNeuro(nn.Module):
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
         x = self.core(x)  # (32, 256, 16, 8, 8)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
+        x = self.common_readout(x)  # (16, 8192, 16)
         if index is None:
             return [readout(x) for readout in self.readouts]
         else:
