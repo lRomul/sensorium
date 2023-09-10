@@ -184,12 +184,22 @@ class PositionalEncoding3d(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
-class ShuffleChannels(nn.Module):
-    def __init__(self, groups: int = 1):
+class ShuffleLayer(nn.Module):
+    def __init__(self,
+                 in_features: int,
+                 out_features: int,
+                 groups: int = 1,
+                 act_layer: Callable = nn.ReLU,
+                 drop_path_rate: float = 0.):
         super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
         self.groups = groups
+        self.conv = nn.Conv1d(in_features, out_features, (1,), groups=groups, bias=False)
+        self.bn = BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer)
+        self.drop_path = DropPath(drop_prob=drop_path_rate)
 
-    def forward(self, x):
+    def shuffle_channels(self, x):
         if self.groups > 1:
             # Shuffle channels between groups
             b, c, t = x.shape
@@ -198,8 +208,19 @@ class ShuffleChannels(nn.Module):
             x = x.reshape(b, -1, t)
         return x
 
-    def extra_repr(self):
-        return f"groups={self.groups}"
+    def tile_shortcut(self, shortcut):
+        if self.in_features != self.out_features:
+            tile_dims = (1, math.ceil(self.out_features / self.in_features), 1)
+            shortcut = torch.tile(shortcut, tile_dims)[:, :self.out_features]
+        return shortcut
+
+    def forward(self, x):
+        shortcut = x
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.shuffle_channels(x)
+        x = self.drop_path(x) + self.tile_shortcut(shortcut)
+        return x
 
 
 class Cortex(nn.Module):
@@ -208,18 +229,19 @@ class Cortex(nn.Module):
                  features: tuple[int, ...],
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
-                 drop_rate: float = 0.):
+                 drop_path_rate: float = 0.):
         super().__init__()
         self.layers = nn.Sequential()
         prev_num_features = in_features
         for layer_index, num_features in enumerate(features):
-            layer_drop_rate = drop_rate * layer_index / len(features)
+            layer_drop_path_rate = drop_path_rate * (layer_index + 1) / len(features)
             self.layers.append(
-                nn.Sequential(
-                    nn.Dropout1d(p=layer_drop_rate),
-                    nn.Conv1d(prev_num_features, num_features, (1,), groups=groups, bias=False),
-                    BatchNormAct(num_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-                    ShuffleChannels(groups),
+                ShuffleLayer(
+                    in_features=prev_num_features,
+                    out_features=num_features,
+                    groups=groups,
+                    act_layer=act_layer,
+                    drop_path_rate=layer_drop_path_rate,
                 )
             )
             prev_num_features = num_features
@@ -339,7 +361,7 @@ class DwiseNeuro(nn.Module):
             features=cortex_features,
             groups=groups,
             act_layer=act_layer,
-            drop_rate=drop_rate,
+            drop_path_rate=drop_path_rate,
         )
 
         self.readouts = nn.ModuleList()
