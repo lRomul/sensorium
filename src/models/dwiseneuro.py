@@ -202,7 +202,7 @@ class ShuffleChannels(nn.Module):
         return f"groups={self.groups}"
 
 
-class VisualCortex(nn.Module):
+class Cortex(nn.Module):
     def __init__(self,
                  in_features: int,
                  features: tuple[int, ...],
@@ -212,10 +212,11 @@ class VisualCortex(nn.Module):
         super().__init__()
         self.layers = nn.Sequential()
         prev_num_features = in_features
-        for num_features in features:
+        for layer_index, num_features in enumerate(features):
+            layer_drop_rate = drop_rate * layer_index / len(features)
             self.layers.append(
                 nn.Sequential(
-                    nn.Dropout1d(p=drop_rate),
+                    nn.Dropout1d(p=layer_drop_rate),
                     nn.Conv1d(prev_num_features, num_features, (1,), groups=groups, bias=False),
                     BatchNormAct(num_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
                     ShuffleChannels(groups),
@@ -333,12 +334,12 @@ class DwiseNeuro(nn.Module):
 
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
-        self.cortex = VisualCortex(
+        self.cortex = Cortex(
             in_features=core_features[-1],
             features=cortex_features,
             groups=groups,
             act_layer=act_layer,
-            drop_rate=drop_rate / 2.,
+            drop_rate=drop_rate,
         )
 
         self.readouts = nn.ModuleList()
@@ -351,6 +352,7 @@ class DwiseNeuro(nn.Module):
                     drop_rate=drop_rate,
                 )
             )
+        print(self)
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
