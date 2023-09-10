@@ -224,9 +224,8 @@ class Readout(nn.Module):
         return x
 
 
-class DwiseNeuro(nn.Module):
+class DepthwiseCore(nn.Module):
     def __init__(self,
-                 readout_outputs: tuple[int, ...],
                  in_channels: int = 1,
                  features: tuple[int, ...] = (64, 128, 256, 512),
                  spatial_strides: tuple[int, ...] = (2, 2, 2, 2),
@@ -234,13 +233,9 @@ class DwiseNeuro(nn.Module):
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 readout_features: int = 4096,
-                 readout_groups: int = 4,
-                 drop_rate: float = 0.,
+                 act_layer: Callable = nn.ReLU,
                  drop_path_rate: float = 0.):
         super().__init__()
-        act_layer = functools.partial(nn.SiLU, inplace=True)
-
         num_blocks = len(features)
         assert num_blocks and num_blocks == len(spatial_strides)
         next_num_features = features[0]
@@ -274,21 +269,61 @@ class DwiseNeuro(nn.Module):
             ]
         self.blocks = nn.Sequential(*blocks)
 
+    def forward(self, x):
+        x = self.stem(x)
+        x = self.blocks(x)
+        return x
+
+
+class DwiseNeuro(nn.Module):
+    def __init__(self,
+                 readout_outputs: tuple[int, ...],
+                 in_channels: int = 1,
+                 features: tuple[int, ...] = (64, 128, 256, 512),
+                 spatial_strides: tuple[int, ...] = (2, 2, 2, 2),
+                 spatial_kernel: int = 3,
+                 temporal_kernel: int = 3,
+                 expansion_ratio: int = 3,
+                 se_reduce_ratio: int = 16,
+                 readout_features: int = 4096,
+                 readout_groups: int = 4,
+                 drop_rate: float = 0.,
+                 drop_path_rate: float = 0.):
+        super().__init__()
+        act_layer = functools.partial(nn.SiLU, inplace=True)
+
+        self.core = DepthwiseCore(
+            in_channels=in_channels,
+            features=features,
+            spatial_strides=spatial_strides,
+            spatial_kernel=spatial_kernel,
+            temporal_kernel=temporal_kernel,
+            expansion_ratio=expansion_ratio,
+            se_reduce_ratio=se_reduce_ratio,
+            act_layer=act_layer,
+            drop_path_rate=drop_path_rate,
+        )
+
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
-            self.readouts += [
-                Readout(next_num_features, readout_features, readout_output,
-                        groups=readout_groups, act_layer=act_layer, drop_rate=drop_rate)
-            ]
+            self.readouts.append(
+                Readout(
+                    in_features=features[-1],
+                    hidden_features=readout_features,
+                    out_features=readout_output,
+                    groups=readout_groups,
+                    act_layer=act_layer,
+                    drop_rate=drop_rate
+                )
+            )
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
-        x = self.stem(x)
-        x = self.blocks(x)
-        x = self.pool(x).squeeze(-1).squeeze(-1)
-
+        # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
+        x = self.core(x)  # (32, 256, 16, 8, 8)
+        x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
         if index is None:
             return [readout(x) for readout in self.readouts]
         else:
-            return self.readouts[index](x)
+            return self.readouts[index](x)  # (32, neurons, 16)
