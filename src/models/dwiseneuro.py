@@ -64,7 +64,7 @@ class DropPath(nn.Module):
         return drop_path(x, self.drop_prob, self.training, self.scale_by_keep)
 
     def extra_repr(self):
-        return f'drop_prob={round(self.drop_prob,3):0.3f}'
+        return f"drop_prob={round(self.drop_prob,3):0.3f}"
 
 
 class InvertedResidual3d(nn.Module):
@@ -184,29 +184,47 @@ class PositionalEncoding3d(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
-class CommonReadout(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 out_features: int,
-                 groups: int = 1,
-                 act_layer: Callable = nn.ReLU,
-                 drop_rate: float = 0.):
+class ShuffleChannels(nn.Module):
+    def __init__(self, groups: int = 1):
         super().__init__()
         self.groups = groups
-        self.layer = nn.Sequential(
-            nn.Dropout1d(p=drop_rate),
-            nn.Conv1d(in_features, out_features, (1,), groups=groups, bias=False),
-            BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
-        )
 
     def forward(self, x):
-        x = self.layer(x)
         if self.groups > 1:
             # Shuffle channels between groups
             b, c, t = x.shape
             x = x.view(b, -1, self.groups, t)
             x = torch.transpose(x, 1, 2)
             x = x.reshape(b, -1, t)
+        return x
+
+    def extra_repr(self):
+        return f"groups={self.groups}"
+
+
+class VisualCortex(nn.Module):
+    def __init__(self,
+                 in_features: int,
+                 features: tuple[int, ...],
+                 groups: int = 1,
+                 act_layer: Callable = nn.ReLU,
+                 drop_rate: float = 0.):
+        super().__init__()
+        self.layers = nn.Sequential()
+        prev_num_features = in_features
+        for num_features in features:
+            self.layers.append(
+                nn.Sequential(
+                    nn.Dropout1d(p=drop_rate),
+                    nn.Conv1d(prev_num_features, num_features, (1,), groups=groups, bias=False),
+                    BatchNormAct(num_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer),
+                    ShuffleChannels(groups),
+                )
+            )
+            prev_num_features = num_features
+
+    def forward(self, x):
+        x = self.layers(x)
         return x
 
 
@@ -288,14 +306,14 @@ class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
                  in_channels: int = 1,
-                 features: tuple[int, ...] = (64, 128, 256, 512),
+                 core_features: tuple[int, ...] = (64, 128, 256, 512),
                  spatial_strides: tuple[int, ...] = (2, 2, 2, 2),
                  spatial_kernel: int = 3,
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 readout_features: int = 4096,
-                 readout_groups: int = 4,
+                 cortex_features: tuple[int, ...] = (4096, 4096),
+                 groups: int = 4,
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
@@ -303,7 +321,7 @@ class DwiseNeuro(nn.Module):
 
         self.core = DepthwiseCore(
             in_channels=in_channels,
-            features=features,
+            features=core_features,
             spatial_strides=spatial_strides,
             spatial_kernel=spatial_kernel,
             temporal_kernel=temporal_kernel,
@@ -315,10 +333,10 @@ class DwiseNeuro(nn.Module):
 
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
-        self.common_readout = CommonReadout(
-            in_features=features[-1],
-            out_features=readout_features,
-            groups=readout_groups,
+        self.cortex = VisualCortex(
+            in_features=core_features[-1],
+            features=cortex_features,
+            groups=groups,
             act_layer=act_layer,
             drop_rate=drop_rate / 2.,
         )
@@ -327,9 +345,9 @@ class DwiseNeuro(nn.Module):
         for readout_output in readout_outputs:
             self.readouts.append(
                 Readout(
-                    in_features=readout_features,
+                    in_features=cortex_features[-1],
                     out_features=readout_output,
-                    groups=readout_groups,
+                    groups=groups,
                     drop_rate=drop_rate,
                 )
             )
@@ -338,7 +356,7 @@ class DwiseNeuro(nn.Module):
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
         x = self.core(x)  # (32, 256, 16, 8, 8)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
-        x = self.common_readout(x)  # (16, 8192, 16)
+        x = self.cortex(x)  # (16, 8192, 16)
         if index is None:
             return [readout(x) for readout in self.readouts]
         else:
