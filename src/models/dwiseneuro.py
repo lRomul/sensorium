@@ -374,7 +374,6 @@ class DwiseNeuro(nn.Module):
                     drop_rate=drop_rate,
                 )
             )
-        print(self)
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
