@@ -80,6 +80,8 @@ class InvertedResidual3d(nn.Module):
                  drop_path_rate: float = 0.,
                  bias: bool = False):
         super().__init__()
+        self.spatial_stride = spatial_stride
+        self.out_features = out_features
         mid_features = in_features * expansion_ratio
         bn_layer = nn.BatchNorm3d
         stride = (1, spatial_stride, spatial_stride)
@@ -117,13 +119,17 @@ class InvertedResidual3d(nn.Module):
             BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False),
         )
 
-        # Projection shortcut
         self.drop_path = DropPath(drop_prob=drop_path_rate)
-        self.proj_sc = nn.Sequential(
-            nn.Conv3d(in_features, out_features, (1, 1, 1), stride=stride,
-                      groups=math.gcd(in_features, out_features), bias=bias),
-            BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False),
-        )
+
+    def interpolate_shortcut(self, shortcut):
+        _, c, t, h, w = shortcut.shape
+        if self.spatial_stride > 1:
+            size = (t, math.ceil(h / self.spatial_stride), math.ceil(w / self.spatial_stride))
+            shortcut = nn.functional.interpolate(shortcut, size=size, mode="nearest")
+        if c != self.out_features:
+            tile_dims = (1, math.ceil(self.out_features / c), 1, 1, 1)
+            shortcut = torch.tile(shortcut, tile_dims)[:, :self.out_features]
+        return shortcut
 
     def forward(self, x):
         shortcut = x
@@ -132,7 +138,7 @@ class InvertedResidual3d(nn.Module):
         x = self.temp_covn_dw(x)
         x = self.se(x)
         x = self.conv_pwl(x)
-        x = self.drop_path(x) + self.proj_sc(shortcut)
+        x = self.drop_path(x) + self.interpolate_shortcut(shortcut)
         return x
 
 
