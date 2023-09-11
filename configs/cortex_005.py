@@ -31,7 +31,7 @@ config = dict(
             "temporal_kernel": 5,
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
-            "cortex_features": (1024 * 8, 1024 * 8),
+            "cortex_features": (1536 * 4, 1536 * 4),
             "groups": 4,
             "drop_rate": 0.2,
             "drop_path_rate": 0.2,
