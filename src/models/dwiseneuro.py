@@ -234,14 +234,13 @@ class Cortex(nn.Module):
         self.layers = nn.Sequential()
         prev_num_features = in_features
         for layer_index, num_features in enumerate(features):
-            layer_drop_path_rate = drop_path_rate * (layer_index + 1) / len(features)
             self.layers.append(
                 ShuffleLayer(
                     in_features=prev_num_features,
                     out_features=num_features,
                     groups=groups,
                     act_layer=act_layer,
-                    drop_path_rate=layer_drop_path_rate,
+                    drop_path_rate=drop_path_rate,
                 )
             )
             prev_num_features = num_features
