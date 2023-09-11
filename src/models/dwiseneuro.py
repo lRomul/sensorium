@@ -223,12 +223,14 @@ class ShuffleLayer(nn.Module):
         return x
 
 
-class Cortex(nn.Module):
+class Readout(nn.Module):
     def __init__(self,
                  in_features: int,
                  features: tuple[int, ...],
+                 out_features: int,
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
+                 drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
         self.layers = nn.Sequential()
@@ -246,28 +248,17 @@ class Cortex(nn.Module):
             )
             prev_num_features = num_features
 
-    def forward(self, x):
-        x = self.layers(x)
-        return x
-
-
-class Readout(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 out_features: int,
-                 groups: int = 1,
-                 drop_rate: float = 0.):
-        super().__init__()
         self.out_features = out_features
         self.layer = nn.Sequential(
             nn.Dropout1d(p=drop_rate),
-            nn.Conv1d(in_features,
+            nn.Conv1d(prev_num_features,
                       math.ceil(out_features / groups) * groups, (1,),
                       groups=groups, bias=True),
         )
         self.gate = nn.Softplus()
 
     def forward(self, x):
+        x = self.layers(x)
         x = self.layer(x)
         x = x[:, :self.out_features]
         x = self.gate(x)
@@ -329,14 +320,14 @@ class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
                  in_channels: int = 1,
-                 core_features: tuple[int, ...] = (64, 128, 256, 512),
+                 features: tuple[int, ...] = (64, 128, 256, 512),
                  spatial_strides: tuple[int, ...] = (2, 2, 2, 2),
                  spatial_kernel: int = 3,
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 cortex_features: tuple[int, ...] = (4096, 4096),
-                 groups: int = 4,
+                 readout_features: tuple[int, ...] = (4096, 4096),
+                 readout_groups: int = 4,
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
@@ -344,7 +335,7 @@ class DwiseNeuro(nn.Module):
 
         self.core = DepthwiseCore(
             in_channels=in_channels,
-            features=core_features,
+            features=features,
             spatial_strides=spatial_strides,
             spatial_kernel=spatial_kernel,
             temporal_kernel=temporal_kernel,
@@ -356,22 +347,17 @@ class DwiseNeuro(nn.Module):
 
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
-        self.cortex = Cortex(
-            in_features=core_features[-1],
-            features=cortex_features,
-            groups=groups,
-            act_layer=act_layer,
-            drop_path_rate=drop_path_rate,
-        )
-
         self.readouts = nn.ModuleList()
         for readout_output in readout_outputs:
             self.readouts.append(
                 Readout(
-                    in_features=cortex_features[-1],
+                    in_features=features[-1],
+                    features=readout_features,
                     out_features=readout_output,
-                    groups=groups,
+                    groups=readout_groups,
+                    act_layer=act_layer,
                     drop_rate=drop_rate,
+                    drop_path_rate=drop_path_rate,
                 )
             )
 
@@ -379,7 +365,6 @@ class DwiseNeuro(nn.Module):
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
         x = self.core(x)  # (32, 256, 16, 8, 8)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
-        x = self.cortex(x)  # (16, 8192, 16)
         if index is None:
             return [readout(x) for readout in self.readouts]
         else:
