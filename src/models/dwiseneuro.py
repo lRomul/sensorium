@@ -120,6 +120,7 @@ class InvertedResidual3d(nn.Module):
         )
 
         self.drop_path = DropPath(drop_prob=drop_path_rate)
+        self.bn_sc = BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False)
 
     def interpolate_shortcut(self, shortcut):
         _, c, t, h, w = shortcut.shape
@@ -129,6 +130,7 @@ class InvertedResidual3d(nn.Module):
         if c != self.out_features:
             tile_dims = (1, math.ceil(self.out_features / c), 1, 1, 1)
             shortcut = torch.tile(shortcut, tile_dims)[:, :self.out_features]
+        shortcut = self.bn_sc(shortcut)
         return shortcut
 
     def forward(self, x):
@@ -204,6 +206,7 @@ class ShuffleLayer(nn.Module):
         self.conv = nn.Conv1d(in_features, out_features, (1,), groups=groups, bias=False)
         self.bn = BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer)
         self.drop_path = DropPath(drop_prob=drop_path_rate)
+        self.bn_sc = BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, apply_act=False)
 
     def shuffle_channels(self, x):
         if self.groups > 1:
@@ -218,6 +221,7 @@ class ShuffleLayer(nn.Module):
         if self.in_features != self.out_features:
             tile_dims = (1, math.ceil(self.out_features / self.in_features), 1)
             shortcut = torch.tile(shortcut, tile_dims)[:, :self.out_features]
+        shortcut = self.bn_sc(shortcut)
         return shortcut
 
     def forward(self, x):
