@@ -184,29 +184,18 @@ class PositionalEncoding3d(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
-class ShuffleLayer(nn.Module):
+class ResidualConv1d(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
-                 groups: int = 1,
                  act_layer: Callable = nn.ReLU,
                  drop_path_rate: float = 0.):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.groups = groups
-        self.conv = nn.Conv1d(in_features, out_features, (1,), groups=groups, bias=False)
+        self.conv = nn.Conv1d(in_features, out_features, (1,), bias=False)
         self.bn = BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer)
         self.drop_path = DropPath(drop_prob=drop_path_rate)
-
-    def shuffle_channels(self, x):
-        if self.groups > 1:
-            # Shuffle channels between groups
-            b, c, t = x.shape
-            x = x.view(b, -1, self.groups, t)
-            x = torch.transpose(x, 1, 2)
-            x = x.reshape(b, -1, t)
-        return x
 
     def tile_shortcut(self, shortcut):
         if self.in_features != self.out_features:
@@ -218,7 +207,6 @@ class ShuffleLayer(nn.Module):
         shortcut = x
         x = self.conv(x)
         x = self.bn(x)
-        x = self.shuffle_channels(x)
         x = self.drop_path(x) + self.tile_shortcut(shortcut)
         return x
 
@@ -227,7 +215,6 @@ class Cortex(nn.Module):
     def __init__(self,
                  in_features: int,
                  features: tuple[int, ...],
-                 groups: int = 1,
                  act_layer: Callable = nn.ReLU,
                  drop_path_rate: float = 0.):
         super().__init__()
@@ -235,10 +222,9 @@ class Cortex(nn.Module):
         prev_num_features = in_features
         for layer_index, num_features in enumerate(features):
             self.layers.append(
-                ShuffleLayer(
+                ResidualConv1d(
                     in_features=prev_num_features,
                     out_features=num_features,
-                    groups=groups,
                     act_layer=act_layer,
                     drop_path_rate=drop_path_rate,
                 )
@@ -254,21 +240,17 @@ class Readout(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
-                 groups: int = 1,
                  drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
         self.layer = nn.Sequential(
             nn.Dropout1d(p=drop_rate),
-            nn.Conv1d(in_features,
-                      math.ceil(out_features / groups) * groups, (1,),
-                      groups=groups, bias=True),
+            nn.Conv1d(in_features, out_features, (1,), bias=True),
         )
         self.gate = nn.Softplus()
 
     def forward(self, x):
         x = self.layer(x)
-        x = x[:, :self.out_features]
         x = self.gate(x)
         return x
 
@@ -334,8 +316,7 @@ class DwiseNeuro(nn.Module):
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 cortex_features: tuple[int, ...] = (4096, 4096),
-                 groups: int = 4,
+                 cortex_features: tuple[int, ...] = (512, 1024),
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
@@ -358,7 +339,6 @@ class DwiseNeuro(nn.Module):
         self.cortex = Cortex(
             in_features=core_features[-1],
             features=cortex_features,
-            groups=groups,
             act_layer=act_layer,
             drop_path_rate=drop_path_rate,
         )
@@ -369,7 +349,6 @@ class DwiseNeuro(nn.Module):
                 Readout(
                     in_features=cortex_features[-1],
                     out_features=readout_output,
-                    groups=groups,
                     drop_rate=drop_rate,
                 )
             )
