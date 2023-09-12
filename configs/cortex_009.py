@@ -31,10 +31,10 @@ config = dict(
             "temporal_kernel": 5,
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
-            "cortex_features": (2048 * 4, 2048 * 4),
+            "cortex_features": (512 * 4, 1024 * 4, 2048 * 4),
             "groups": 4,
             "drop_rate": 0.2,
-            "drop_path_rate": 0.3,
+            "drop_path_rate": 0.2,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
