@@ -6,7 +6,6 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
-from src.responses import ResponseNormalizer
 from src.utils import get_best_model_path
 from src.predictors import Predictor
 from src.data import get_mouse_data
@@ -121,14 +120,12 @@ def make_submission(experiment: str, split: str):
     prediction_dir = constants.predictions_dir / experiment / split
     data = []
     for mouse in constants.new_mice:
-        normalizer = ResponseNormalizer(mouse)
         mouse_data = get_mouse_data(mouse=mouse, splits=[split])
         neuron_ids = mouse_data["neuron_ids"].tolist()
         mouse_prediction_dir = prediction_dir / mouse
         for trial_data in mouse_data["trials"]:
             trial_id = trial_data['trial_id']
             prediction = np.load(str(mouse_prediction_dir / f"{trial_id}.npy"))
-            prediction = normalizer(prediction)
             prediction = cut_responses_for_submission(prediction)
             data.append((mouse, trial_id, prediction.tolist(), neuron_ids))
     submission_df = pd.DataFrame.from_records(

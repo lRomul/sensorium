@@ -12,7 +12,7 @@ from src.mixup import Mixup
 from src.utils import set_random_seed
 from src.inputs import InputsProcessor
 from src.indexes import IndexesGenerator
-from src.responses import ResponsesProcessor
+from src.responses import ResponsesProcessor, ResponseNormalizer
 from src import constants
 
 
@@ -28,6 +28,7 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
         self.indexes_generator = indexes_generator
         self.inputs_processor = inputs_processor
         self.responses_processor = responses_processor
+        self.response_normalizer = ResponseNormalizer(self.mouse)
 
         self.trials = self.mouse_data["trials"]
         self.num_trials = len(self.trials)
@@ -39,7 +40,9 @@ class MouseVideoDataset(Dataset, metaclass=abc.ABCMeta):
         return frames
 
     def get_responses(self, trial_index: int, indexes: list[int]) -> np.ndarray:
-        responses = np.load(self.trials[trial_index]["response_path"])[..., indexes]
+        responses = np.load(self.trials[trial_index]["response_path"])
+        responses = self.response_normalizer(responses)
+        responses = responses[..., indexes]
         return responses
 
     def get_behavior(self, trial_index: int, indexes: list[int]) -> np.ndarray:
