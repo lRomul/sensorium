@@ -16,6 +16,7 @@ from argus.callbacks import (
 )
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset, ConcatMiceVideoDataset
+from src.mixers import Mixup, CutMix, RandomChoiceMixer
 from src.responses import get_responses_processor
 from src.ema import ModelEma, EmaCheckpoint
 from src.inputs import get_inputs_processor
@@ -24,7 +25,6 @@ from src.metrics import CorrelationMetric
 from src.indexes import IndexesGenerator
 from src.argus_models import MouseModel
 from src.data import get_mouse_data
-from src.mixup import Mixup
 from src import constants
 
 
@@ -56,7 +56,12 @@ def train_mouse(config: dict, save_dir: Path, train_splits: list[str], val_split
     inputs_processor = get_inputs_processor(*argus_params["inputs_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
 
-    mixup = Mixup(**config["mixup"]) if config["mixup"]["prob"] else None
+    mixer_params = config["mixer"]
+    mixer = RandomChoiceMixer(
+        [Mixup(**mixer_params["mixup"]), CutMix(**mixer_params["cutmix"])],
+        choice_probs=mixer_params["choice_probs"],
+        prob=mixer_params["prob"],
+    )
     train_datasets = []
     mouse_epoch_size = config["train_epoch_size"] // constants.num_mice
     for mouse in constants.mice:
@@ -67,7 +72,7 @@ def train_mouse(config: dict, save_dir: Path, train_splits: list[str], val_split
                 inputs_processor=inputs_processor,
                 responses_processor=responses_processor,
                 epoch_size=mouse_epoch_size,
-                mixup=mixup,
+                mixer=mixer,
             )
         ]
     train_dataset = ConcatMiceVideoDataset(train_datasets)

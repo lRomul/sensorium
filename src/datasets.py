@@ -8,7 +8,7 @@ from torch import nn
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from src.mixup import Mixup
+from src.mixers import Mixer
 from src.utils import set_random_seed
 from src.inputs import InputsProcessor
 from src.indexes import IndexesGenerator
@@ -95,11 +95,11 @@ class TrainMouseVideoDataset(MouseVideoDataset):
                  responses_processor: ResponsesProcessor,
                  epoch_size: int,
                  augmentations: nn.Module | None = None,
-                 mixup: Mixup | None = None):
+                 mixer: Mixer | None = None):
         super().__init__(mouse_data, indexes_generator, inputs_processor, responses_processor)
         self.epoch_size = epoch_size
         self.augmentations = augmentations
-        self.mixup = mixup
+        self.mixer = mixer
 
     def __len__(self) -> int:
         return self.epoch_size
@@ -123,9 +123,9 @@ class TrainMouseVideoDataset(MouseVideoDataset):
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
         sample = self.get_sample_tensors(index)
-        if self.mixup is not None and self.mixup.use():
+        if self.mixer is not None and self.mixer.use():
             random_sample = self.get_sample_tensors(index + 1)
-            sample = self.mixup(sample, random_sample)
+            sample = self.mixer(sample, random_sample)
         return sample
 
 
