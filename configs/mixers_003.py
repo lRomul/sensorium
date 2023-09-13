@@ -62,7 +62,7 @@ config = dict(
     mixer={
         "mixup": {"alpha": 0.4, "prob": 1.0},
         "cutmix": {"alpha": 1.0, "prob": 1.0},
-        "choice_probs": [0.0, 1.0],  # [mixup, cutmix]
-        "prob": 0.75,
+        "choice_probs": [0.5, 0.5],  # [mixup, cutmix]
+        "prob": 0.5,
     },
 )
