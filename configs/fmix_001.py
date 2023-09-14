@@ -59,8 +59,11 @@ config = dict(
         "amp": True,
         "iter_size": 2,
     },
-    cutmix={
-        "alpha": 1.0,
-        "prob": 0.5,
+    fmix={
+        "decay_power": 3.,
+        "alpha": 1.,
+        "size": (frame_stack_size,) + image_size,
+        "max_soft":  0.0,
+        "prob": 1.0
     },
 )
