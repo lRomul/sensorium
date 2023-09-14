@@ -12,7 +12,7 @@ config = dict(
     base_lr=base_lr,
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
-    train_epoch_size=80000,
+    train_epoch_size=72000,
     num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=8,
@@ -61,6 +61,6 @@ config = dict(
     },
     cutmix={
         "alpha": 1.0,
-        "prob": 0.7,
+        "prob": 0.6,
     },
 )
