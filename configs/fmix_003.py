@@ -60,10 +60,10 @@ config = dict(
         "iter_size": 2,
     },
     fmix={
-        "decay_power": 3.,
+        "decay_power": 6.,
         "alpha": 1.,
         "size": (frame_stack_size,) + image_size,
-        "max_soft":  0.25,
+        "max_soft":  0.0,
         "prob": 1.0
     },
 )
