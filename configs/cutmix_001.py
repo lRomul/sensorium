@@ -12,7 +12,7 @@ config = dict(
     base_lr=base_lr,
     min_base_lr=base_lr * 0.01,
     ema_decay=0.999,
-    train_epoch_size=64000,
+    train_epoch_size=72000,
     num_epochs=[3, 18],
     stages=["warmup", "train"],
     num_dataloader_workers=8,
@@ -59,10 +59,8 @@ config = dict(
         "amp": True,
         "iter_size": 2,
     },
-    mixer={
-        "mixup": {"alpha": 0.4, "prob": 1.0},
-        "cutmix": {"alpha": 1.0, "prob": 1.0},
-        "choice_probs": [0.0, 1.0],  # [mixup, cutmix]
+    cutmix={
+        "alpha": 1.0,
         "prob": 0.5,
     },
 )
