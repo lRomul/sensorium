@@ -61,6 +61,6 @@ config = dict(
     },
     cutmix={
         "alpha": 1.0,
-        "prob": 0.6,
+        "prob": 0.7,
     },
 )
