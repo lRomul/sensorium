@@ -62,8 +62,8 @@ config = dict(
     fmix={
         "decay_power": 3.,
         "alpha": 1.,
-        "size": (frame_stack_size,) + image_size,
-        "max_soft":  0.25,
+        "size": image_size,
+        "max_soft":  0.0,
         "prob": 0.5,
     },
 )
