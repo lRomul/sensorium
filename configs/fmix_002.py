@@ -63,7 +63,7 @@ config = dict(
         "decay_power": 3.,
         "alpha": 1.,
         "size": (frame_stack_size,) + image_size,
-        "max_soft":  0.0,
+        "max_soft":  0.25,
         "prob": 1.0
     },
 )
