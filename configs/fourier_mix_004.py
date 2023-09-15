@@ -64,6 +64,6 @@ config = dict(
         "alpha": 1.,
         "size": image_size,
         "max_soft":  0.0,
-        "prob": 0.5,
+        "prob": 0.6,
     },
 )
