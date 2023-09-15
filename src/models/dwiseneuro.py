@@ -192,6 +192,63 @@ class PositionalEncoding3d(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
+class MHSA(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        head_dim: int = 32,
+        qkv_bias: bool = False,
+        attn_drop: float = 0.0,
+        proj_drop: float = 0.0,
+        drop_path_rate: float = 0.0,
+    ) -> None:
+        super().__init__()
+        assert dim % head_dim == 0
+        self.head_dim = head_dim
+        self.num_heads = dim // head_dim
+        self.scale = head_dim**-0.5
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+        self.drop_path = DropPath(drop_path_rate)
+
+    def forward_2d(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, h, w = x.shape
+        n = h * w
+        x = torch.flatten(x, start_dim=2).transpose(-2, -1)
+        qkv = (
+            self.qkv(x)
+            .reshape(b, n, 3, self.num_heads, self.head_dim)
+            .permute(2, 0, 3, 1, 4)
+        )
+        q, k, v = qkv.unbind(0)
+
+        attn = (q * self.scale) @ k.transpose(-2, -1)
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(b, n, c)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        x = x.transpose(-2, -1).reshape(b, c, h, w)
+        return x
+
+    def forward_3d(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, t, h, w = x.shape
+        x = x.transpose(1, 2)
+        x = x.reshape(b * t, c, h, w)
+        x = self.forward_2d(x)
+        x = x.view(b, t, c, h, w)
+        x = x.transpose(1, 2)
+        return x
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x + self.drop_path(self.forward_3d(x))
+        return x
+
+
 class ShuffleLayer(nn.Module):
     def __init__(self,
                  in_features: int,
@@ -363,6 +420,14 @@ class DwiseNeuro(nn.Module):
             drop_path_rate=drop_path_rate,
         )
 
+        self.mhsa = MHSA(
+            dim=core_features[-1],
+            head_dim=32,
+            qkv_bias=False,
+            attn_drop=0.0,
+            proj_drop=0.0,
+            drop_path_rate=drop_path_rate,
+        )
         self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
 
         self.cortex = Cortex(
@@ -387,6 +452,7 @@ class DwiseNeuro(nn.Module):
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
         x = self.core(x)  # (32, 256, 16, 8, 8)
+        x = self.mhsa(x)  # (32, 256, 16, 8, 8)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
         x = self.cortex(x)  # (16, 8192, 16)
         if index is None:
