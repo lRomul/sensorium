@@ -32,6 +32,7 @@ config = dict(
             "expansion_ratio": 6,
             "se_reduce_ratio": 32,
             "cortex_features": (512 * 2, 1024 * 2, 2048 * 2),
+            "cortex_kernels": (3, 1, 1),
             "groups": 2,
             "drop_rate": 0.2,
             "drop_path_rate": 0.2,

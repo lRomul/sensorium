@@ -196,6 +196,7 @@ class ShuffleLayer(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
+                 kernel_size: int = 1,
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
                  drop_path_rate: float = 0.):
@@ -203,7 +204,8 @@ class ShuffleLayer(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.groups = groups
-        self.conv = nn.Conv1d(in_features, out_features, (1,), groups=groups, bias=False)
+        self.conv = nn.Conv1d(in_features, out_features, (kernel_size,),
+                              padding=(kernel_size // 2,), groups=groups, bias=False)
         self.bn = BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer)
         self.drop_path = DropPath(drop_prob=drop_path_rate)
         self.bn_sc = BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, apply_act=False)
@@ -237,17 +239,20 @@ class Cortex(nn.Module):
     def __init__(self,
                  in_features: int,
                  features: tuple[int, ...],
+                 kernel_sizes: tuple[int, ...],
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
                  drop_path_rate: float = 0.):
         super().__init__()
+        assert len(features) == len(kernel_sizes)
         self.layers = nn.Sequential()
         prev_num_features = in_features
-        for layer_index, num_features in enumerate(features):
+        for num_features, kernel_size in zip(features, kernel_sizes):
             self.layers.append(
                 ShuffleLayer(
                     in_features=prev_num_features,
                     out_features=num_features,
+                    kernel_size=kernel_size,
                     groups=groups,
                     act_layer=act_layer,
                     drop_path_rate=drop_path_rate,
@@ -345,6 +350,7 @@ class DwiseNeuro(nn.Module):
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  cortex_features: tuple[int, ...] = (4096, 4096),
+                 cortex_kernels: tuple[int, ...] = (1, 1),
                  groups: int = 4,
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
@@ -368,6 +374,7 @@ class DwiseNeuro(nn.Module):
         self.cortex = Cortex(
             in_features=core_features[-1],
             features=cortex_features,
+            kernel_sizes=cortex_kernels,
             groups=groups,
             act_layer=act_layer,
             drop_path_rate=drop_path_rate,
