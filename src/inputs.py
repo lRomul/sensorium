@@ -1,5 +1,4 @@
 import abc
-from typing import Type
 
 import numpy as np
 
@@ -36,7 +35,7 @@ class StackInputsProcessor(InputsProcessor):
         return tensor_frames
 
 
-_INPUTS_PROCESSOR_REGISTRY: dict[str, Type[InputsProcessor]] = dict(
+_INPUTS_PROCESSOR_REGISTRY: dict[str, type[InputsProcessor]] = dict(
     stack_inputs=StackInputsProcessor,
 )
 

@@ -176,9 +176,22 @@ class FMix(Mixer):
         return inputs, target
 
 
+_MIXER_REGISTRY: dict[str, type[Mixer]] = dict(
+    mixup=Mixup,
+    cutmix=CutMix,
+    fmix=FMix,
+)
+
+
+def get_mixer(name: str, mixer_params: dict) -> Mixer:
+    assert name in _MIXER_REGISTRY
+    return _MIXER_REGISTRY[name](**mixer_params)
+
+
 class RandomChoiceMixer(Mixer):
     def __init__(self, mixers: list[Mixer], choice_probs: list[float], prob: float = 1.0):
         super().__init__(prob)
+        assert len(mixers) == len(choice_probs)
         self.mixers = mixers
         self.choice_probs = choice_probs
 
@@ -186,3 +199,13 @@ class RandomChoiceMixer(Mixer):
         mixer_index = np.random.choice(range(len(self.mixers)), p=self.choice_probs)
         mixer = self.mixers[mixer_index]
         return mixer(sample1, sample2)
+
+
+def get_random_choice_mixer(mixers_params: list[tuple[str, dict]],
+                            choice_probs: list[float],
+                            prob: float = 1.0):
+    mixers = []
+    for name, mixer_params in mixers_params:
+        mixers.append(get_mixer(name, mixer_params))
+    mixer = RandomChoiceMixer(mixers, choice_probs, prob=prob)
+    return mixer

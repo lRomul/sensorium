@@ -1,5 +1,4 @@
 import abc
-from typing import Type
 
 import numpy as np
 
@@ -55,7 +54,7 @@ class SelectLastResponsesProcessor(IndexingResponsesProcessor):
         super().__init__(index=-1)
 
 
-_RESPONSES_PROCESSOR_REGISTRY: dict[str, Type[ResponsesProcessor]] = dict(
+_RESPONSES_PROCESSOR_REGISTRY: dict[str, type[ResponsesProcessor]] = dict(
     identity=IdentityResponsesProcessor,
     indexing=IndexingResponsesProcessor,
     last=SelectLastResponsesProcessor,

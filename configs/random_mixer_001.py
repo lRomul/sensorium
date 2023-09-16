@@ -59,11 +59,13 @@ config = dict(
         "amp": True,
         "iter_size": 2,
     },
-    fmix={
-        "decay_power": 3.,
-        "alpha": 1.,
-        "size": image_size,
-        "max_soft":  0.0,
+    mixer={
+        "mixers_params": [
+            ("cutmix", {"alpha": 1.0, "prob": 1.0}),
+            ("fmix", {"decay_power": 3., "alpha": 1., "size": image_size, "max_soft": 0.0, "prob": 1.0}),
+            ("mixup", {"alpha": 0.4, "prob": 1.0}),
+        ],
+        "choice_probs": [0.5, 0.4, 0.1],  # [cutmix, fmix, mixup]
         "prob": 0.6,
     },
 )
