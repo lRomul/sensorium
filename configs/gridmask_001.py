@@ -59,11 +59,12 @@ config = dict(
         "amp": True,
         "iter_size": 2,
     },
-    fmix={
-        "decay_power": 3.,
-        "alpha": 1.,
+    gridmask={
+        "d1": 24,
+        "d2": 48,
         "size": image_size,
-        "max_soft":  0.0,
-        "prob": 0.6,
+        "rotate": 1,
+        "ratio": 0.4,
+        "prob": 0.5,
     },
 )

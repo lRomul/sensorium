@@ -3,6 +3,7 @@ import math
 import random
 
 import numpy as np
+from PIL import Image
 
 import torch
 
@@ -142,7 +143,7 @@ def binarize_mask(mask, lam, in_shape, max_soft=0.0):
     return mask
 
 
-def sample_mask(alpha, decay_power, shape, max_soft=0.0):
+def sample_fmix_mask(alpha, decay_power, shape, max_soft=0.0):
     if isinstance(shape, int):
         shape = (shape,)
     lam = np.random.beta(alpha, alpha)
@@ -167,8 +168,64 @@ class FMix(Mixer):
     def __call__(self, sample1: SampleType, sample2: SampleType) -> SampleType:
         inputs1, target1 = sample1
         inputs2, target2 = sample2
-        lam, mask = sample_mask(self.alpha, self.decay_power,
-                                self.size, max_soft=self.max_soft)
+        lam, mask = sample_fmix_mask(self.alpha, self.decay_power,
+                                     self.size, max_soft=self.max_soft)
+        mask = torch.from_numpy(mask).to(dtype=inputs1.dtype, device=inputs1.device)
+        mask = mask.expand_as(inputs1)
+        inputs = (1 - mask) * inputs1 + mask * inputs2
+        target = (1 - lam) * target1 + lam * target2
+        return inputs, target
+
+
+def sample_grid_mask(d1: int, d2: int, size: tuple[int, int], rotate: int = 1, ratio: float = 0.5):
+    h, w = size
+    hh = math.ceil((math.sqrt(h * h + w * w)))
+    d = np.random.randint(d1, d2)
+    l = math.ceil(d * ratio)
+    mask = np.ones((hh, hh), np.float32)
+    st_h = np.random.randint(d)
+    st_w = np.random.randint(d)
+    for i in range(-1, hh // d + 1):
+        s = d * i + st_h
+        t = s + l
+        s = max(min(s, hh), 0)
+        t = max(min(t, hh), 0)
+        mask[s:t, :] *= 0
+    for i in range(-1, hh // d + 1):
+        s = d * i + st_w
+        t = s + l
+        s = max(min(s, hh), 0)
+        t = max(min(t, hh), 0)
+        mask[:, s:t] *= 0
+    r = np.random.randint(rotate)
+    mask = Image.fromarray(np.uint8(mask))
+    mask = mask.rotate(r)
+    mask = np.asarray(mask)
+    mask = mask[(hh - h) // 2:(hh - h) // 2 + h, (hh - w) // 2:(hh - w) // 2 + w]
+    mask = mask.copy()
+    lam = mask.sum() / (h * w)
+    return lam, mask
+
+
+class GridMask(Mixer):
+    def __init__(self,
+                 d1: int,
+                 d2: int,
+                 size: tuple[int, int],
+                 rotate: int = 1,
+                 ratio: float = 0.5,
+                 prob: float = 1.0):
+        super().__init__(prob)
+        self.d1 = d1
+        self.d2 = d2
+        self.size = size
+        self.rotate = rotate
+        self.ratio = ratio
+
+    def __call__(self, sample1: SampleType, sample2: SampleType) -> SampleType:
+        inputs1, target1 = sample1
+        inputs2, target2 = sample2
+        lam, mask = sample_grid_mask(self.d1, self.d2, self.size, rotate=self.rotate, ratio=self.ratio)
         mask = torch.from_numpy(mask).to(dtype=inputs1.dtype, device=inputs1.device)
         mask = mask.expand_as(inputs1)
         inputs = (1 - mask) * inputs1 + mask * inputs2

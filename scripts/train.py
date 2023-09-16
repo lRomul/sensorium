@@ -24,7 +24,7 @@ from src.metrics import CorrelationMetric
 from src.indexes import IndexesGenerator
 from src.argus_models import MouseModel
 from src.data import get_mouse_data
-from src.mixers import FMix
+from src.mixers import GridMask
 from src import constants
 
 
@@ -56,7 +56,7 @@ def train_mouse(config: dict, save_dir: Path, train_splits: list[str], val_split
     inputs_processor = get_inputs_processor(*argus_params["inputs_processor"])
     responses_processor = get_responses_processor(*argus_params["responses_processor"])
 
-    mixer = FMix(**config["fmix"])
+    mixer = GridMask(**config["gridmask"])
     train_datasets = []
     mouse_epoch_size = config["train_epoch_size"] // constants.num_mice
     for mouse in constants.mice:
