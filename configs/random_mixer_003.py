@@ -66,6 +66,6 @@ config = dict(
             ("mixup", {"alpha": 0.4, "prob": 1.0}),
         ],
         "choice_probs": [0.34, 0.33, 0.33],  # [cutmix, fmix, mixup]
-        "prob": 0.6,
+        "prob": 0.5,
     },
 )
