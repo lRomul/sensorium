@@ -65,7 +65,8 @@ def make_submission(experiment: str, split: str):
         data,
         columns=['mouse', 'trial_indices', 'prediction', 'neuron_ids']
     )
-    split = split.replace('_test_', '_').replace('bonus', 'ood')
+    del data
+    split = split.replace('_test_', '_').replace('bonus', 'test_bonus_ood')
     submission_path = prediction_dir / f"predictions_{split}.parquet.brotli"
     submission_df.to_parquet(submission_path, compression='brotli', engine='pyarrow', index=False)
     print(f"Submission saved to '{submission_path}'")
