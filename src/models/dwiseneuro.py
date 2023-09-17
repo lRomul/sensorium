@@ -274,12 +274,11 @@ class Readout(nn.Module):
                       math.ceil(out_features / groups) * groups, (1,),
                       groups=groups, bias=True),
         )
-        self.gate = nn.Softplus()
 
     def forward(self, x):
         x = self.layer(x)
         x = x[:, :self.out_features]
-        x = self.gate(x)
+        x = nn.functional.elu(x) + 1.0
         return x
 
 
