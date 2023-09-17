@@ -192,6 +192,32 @@ class PositionalEncoding3d(nn.Module):
         return x + cached_encoding.expand_as(x)
 
 
+class GroupGeneralizedMeanPooling3d(nn.Module):
+    def __init__(self,
+                 norm: float,
+                 output_size: tuple[int | None, int | None, int | None] = (1, 1, 1),
+                 groups: int = 1,
+                 eps: float = 1e-6):
+        super().__init__()
+        assert norm > 0
+        self.groups = groups
+        self.p = nn.Parameter(torch.ones(1, groups, 1, 1, 1, 1) * norm)
+        self.output_size = output_size
+        self.eps = eps
+
+    def forward(self, x):
+        b, c, t, h, w = x.shape
+        assert c % self.groups == 0
+        x = x.view(b, self.groups, -1, t, h, w)
+        x = x.clamp(min=self.eps).pow(self.p)
+        x = x.view(b, -1, t, h, w)
+        x = nn.functional.adaptive_avg_pool3d(x, self.output_size)
+        x = x.view(b, self.groups, -1, *x.shape[-3:])
+        x = x.pow(1. / self.p)
+        x = x.reshape(b, -1, *x.shape[-3:])
+        return x
+
+
 class ShuffleLayer(nn.Module):
     def __init__(self,
                  in_features: int,
@@ -344,6 +370,8 @@ class DwiseNeuro(nn.Module):
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
+                 gem_norm: float = 3.,
+                 gem_groups: int = 8,
                  cortex_features: tuple[int, ...] = (4096, 4096),
                  groups: int = 4,
                  drop_rate: float = 0.,
@@ -363,7 +391,7 @@ class DwiseNeuro(nn.Module):
             drop_path_rate=drop_path_rate,
         )
 
-        self.pool = nn.AdaptiveAvgPool3d((None, 1, 1))
+        self.pool = GroupGeneralizedMeanPooling3d(gem_norm, (None, 1, 1), groups=gem_groups)
 
         self.cortex = Cortex(
             in_features=core_features[-1],
