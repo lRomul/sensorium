@@ -370,8 +370,6 @@ class DwiseNeuro(nn.Module):
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
-                 gem_norm: float = 3.,
-                 gem_groups: int = 8,
                  cortex_features: tuple[int, ...] = (4096, 4096),
                  groups: int = 4,
                  drop_rate: float = 0.,
@@ -391,7 +389,7 @@ class DwiseNeuro(nn.Module):
             drop_path_rate=drop_path_rate,
         )
 
-        self.pool = GroupGeneralizedMeanPooling3d(gem_norm, (None, 1, 1), groups=gem_groups)
+        self.pool = GroupGeneralizedMeanPooling3d(1.0, (None, 1, 1), groups=groups)
 
         self.cortex = Cortex(
             in_features=core_features[-1],
