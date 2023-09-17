@@ -31,7 +31,7 @@ class MicePoissonLoss(nn.Module):
                     masked_input, masked_target, mouse_weights[mask]
                 )
                 if self.max_loss_ratio:
-                    loss_value += self.max_loss_ratio * self.weighted_sum_poisson(
+                    loss_value += (self.max_loss_ratio * mask.shape[0]) * self.weighted_sum_poisson(
                         masked_input.max(dim=-1)[0], masked_target.max(dim=-1)[0], mouse_weights[mask]
                     )
         return loss_value
