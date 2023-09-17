@@ -37,6 +37,7 @@ config = dict(
             "drop_path_rate": 0.2,
         }),
         "loss": ("mice_poisson", {
+            "max_loss_ratio": 0.2,
             "log_input": False,
             "full": False,
             "eps": 1e-8,
