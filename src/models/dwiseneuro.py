@@ -389,7 +389,7 @@ class DwiseNeuro(nn.Module):
             drop_path_rate=drop_path_rate,
         )
 
-        self.pool = GroupGeneralizedMeanPooling3d(2.0, (None, 1, 1), groups=groups)
+        self.pool = GroupGeneralizedMeanPooling3d(2.0, (None, 1, 1), groups=core_features[-1])
 
         self.cortex = Cortex(
             in_features=core_features[-1],
