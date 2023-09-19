@@ -260,10 +260,10 @@ class Cortex(nn.Module):
         return x
 
 
-class LearnableSoftplus(nn.Module):
-    def __init__(self, beta: float):
+class LearnableSoftplus1d(nn.Module):
+    def __init__(self, num_features: int, beta: float):
         super().__init__()
-        self.beta = nn.Parameter(torch.tensor(float(beta)))
+        self.beta = nn.Parameter(torch.ones(1, num_features, 1) * beta)
 
     def forward(self, x):
         xb = x * self.beta
@@ -285,7 +285,7 @@ class Readout(nn.Module):
                       math.ceil(out_features / groups) * groups, (1,),
                       groups=groups, bias=True),
         )
-        self.gate = LearnableSoftplus(beta=softplus_beta)
+        self.gate = LearnableSoftplus1d(self.out_features, beta=softplus_beta)
 
     def forward(self, x):
         x = self.layer(x)
