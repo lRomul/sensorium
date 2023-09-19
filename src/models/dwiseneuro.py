@@ -304,6 +304,7 @@ class DepthwiseCore(nn.Module):
         assert num_blocks and num_blocks == len(spatial_strides)
         next_num_features = features[0]
         self.stem = nn.Sequential(
+            BatchNormAct(in_channels, bn_layer=bn_layer, apply_act=False),
             nn.Conv3d(in_channels, next_num_features, (1, 1, 1), bias=False),
             BatchNormAct(next_num_features, bn_layer=bn_layer, apply_act=False),
         )
