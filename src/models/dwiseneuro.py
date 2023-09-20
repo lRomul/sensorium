@@ -77,13 +77,13 @@ class InvertedResidual3d(nn.Module):
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  act_layer: Callable = nn.ReLU,
+                 bn_layer: Callable = nn.BatchNorm3d,
                  drop_path_rate: float = 0.,
                  bias: bool = False):
         super().__init__()
         self.spatial_stride = spatial_stride
         self.out_features = out_features
         mid_features = in_features * expansion_ratio
-        bn_layer = nn.BatchNorm3d
         stride = (1, spatial_stride, spatial_stride)
 
         # Point-wise expansion
@@ -198,15 +198,16 @@ class ShuffleLayer(nn.Module):
                  out_features: int,
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
+                 bn_layer: Callable = nn.BatchNorm1d,
                  drop_path_rate: float = 0.):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.groups = groups
         self.conv = nn.Conv1d(in_features, out_features, (1,), groups=groups, bias=False)
-        self.bn = BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, act_layer=act_layer)
+        self.bn = BatchNormAct(out_features, bn_layer=bn_layer, act_layer=act_layer)
         self.drop_path = DropPath(drop_prob=drop_path_rate)
-        self.bn_sc = BatchNormAct(out_features, bn_layer=nn.BatchNorm1d, apply_act=False)
+        self.bn_sc = BatchNormAct(out_features, bn_layer=bn_layer, apply_act=False)
 
     def shuffle_channels(self, x):
         if self.groups > 1:
@@ -239,6 +240,7 @@ class Cortex(nn.Module):
                  features: tuple[int, ...],
                  groups: int = 1,
                  act_layer: Callable = nn.ReLU,
+                 bn_layer: Callable = nn.BatchNorm1d,
                  drop_path_rate: float = 0.):
         super().__init__()
         self.layers = nn.Sequential()
@@ -250,6 +252,7 @@ class Cortex(nn.Module):
                     out_features=num_features,
                     groups=groups,
                     act_layer=act_layer,
+                    bn_layer=bn_layer,
                     drop_path_rate=drop_path_rate,
                 )
             )
@@ -294,6 +297,7 @@ class DepthwiseCore(nn.Module):
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
                  act_layer: Callable = nn.ReLU,
+                 bn_layer: Callable = nn.BatchNorm3d,
                  drop_path_rate: float = 0.):
         super().__init__()
         num_blocks = len(features)
@@ -301,7 +305,7 @@ class DepthwiseCore(nn.Module):
         next_num_features = features[0]
         self.stem = nn.Sequential(
             nn.Conv3d(in_channels, next_num_features, (1, 1, 1), bias=False),
-            BatchNormAct(next_num_features, bn_layer=nn.BatchNorm3d, apply_act=False),
+            BatchNormAct(next_num_features, bn_layer=bn_layer, apply_act=False),
         )
 
         blocks = []
@@ -323,6 +327,7 @@ class DepthwiseCore(nn.Module):
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
+                    bn_layer=bn_layer,
                     drop_path_rate=block_drop_path_rate,
                     bias=False,
                 )
@@ -362,6 +367,7 @@ class DwiseNeuro(nn.Module):
             expansion_ratio=expansion_ratio,
             se_reduce_ratio=se_reduce_ratio,
             act_layer=act_layer,
+            bn_layer=nn.BatchNorm3d,
             drop_path_rate=drop_path_rate,
         )
 
@@ -372,6 +378,7 @@ class DwiseNeuro(nn.Module):
             features=cortex_features,
             groups=groups,
             act_layer=act_layer,
+            bn_layer=nn.BatchNorm1d,
             drop_path_rate=drop_path_rate,
         )
 
