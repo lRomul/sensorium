@@ -361,6 +361,7 @@ class DwiseNeuro(nn.Module):
             "silu": functools.partial(nn.SiLU, inplace=True),
             "gelu": nn.GELU,
             "relu": functools.partial(nn.ReLU, inplace=True),
+            "mish": functools.partial(nn.Mish, inplace=True),
         }
 
         self.core = DepthwiseCore(
