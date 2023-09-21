@@ -353,10 +353,14 @@ class DwiseNeuro(nn.Module):
                  cortex_features: tuple[int, ...] = (4096, 4096),
                  groups: int = 4,
                  softplus_beta: int = 1,
+                 act_layer: str = "silu",
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
-        act_layer = functools.partial(nn.SiLU, inplace=True)
+        act_layers = {
+            "silu": functools.partial(nn.SiLU, inplace=True),
+            "gelu": nn.GELU,
+        }
 
         self.core = DepthwiseCore(
             in_channels=in_channels,
@@ -366,7 +370,7 @@ class DwiseNeuro(nn.Module):
             temporal_kernel=temporal_kernel,
             expansion_ratio=expansion_ratio,
             se_reduce_ratio=se_reduce_ratio,
-            act_layer=act_layer,
+            act_layer=act_layers[act_layer],
             bn_layer=nn.BatchNorm3d,
             drop_path_rate=drop_path_rate,
         )
@@ -377,7 +381,7 @@ class DwiseNeuro(nn.Module):
             in_features=core_features[-1],
             features=cortex_features,
             groups=groups,
-            act_layer=act_layer,
+            act_layer=act_layers[act_layer],
             bn_layer=nn.BatchNorm1d,
             drop_path_rate=drop_path_rate,
         )
