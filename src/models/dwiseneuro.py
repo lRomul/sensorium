@@ -360,6 +360,7 @@ class DwiseNeuro(nn.Module):
         act_layers = {
             "silu": functools.partial(nn.SiLU, inplace=True),
             "gelu": nn.GELU,
+            "relu": functools.partial(nn.ReLU, inplace=True),
         }
 
         self.core = DepthwiseCore(
