@@ -353,15 +353,14 @@ class DwiseNeuro(nn.Module):
                  cortex_features: tuple[int, ...] = (4096, 4096),
                  groups: int = 4,
                  softplus_beta: int = 1,
-                 core_norm_layer: str = "batchnorm",
+                 norm_layer: str = "batchnorm",
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
         act_layer = functools.partial(nn.SiLU, inplace=True)
-        core_norm_layers = {
-            "batchnorm": nn.BatchNorm3d,
-            "instancenorm": nn.InstanceNorm3d,
-        }
+        core_norm_layers = {"batchnorm": nn.BatchNorm3d, "instancenorm": nn.InstanceNorm3d}
+        cortex_norm_layers = {"batchnorm": nn.BatchNorm1d, "instancenorm": nn.InstanceNorm1d}
+
         self.core = DepthwiseCore(
             in_channels=in_channels,
             features=core_features,
@@ -371,7 +370,7 @@ class DwiseNeuro(nn.Module):
             expansion_ratio=expansion_ratio,
             se_reduce_ratio=se_reduce_ratio,
             act_layer=act_layer,
-            bn_layer=core_norm_layers[core_norm_layer],
+            bn_layer=core_norm_layers[norm_layer],
             drop_path_rate=drop_path_rate,
         )
 
@@ -382,7 +381,7 @@ class DwiseNeuro(nn.Module):
             features=cortex_features,
             groups=groups,
             act_layer=act_layer,
-            bn_layer=nn.BatchNorm1d,
+            bn_layer=cortex_norm_layers[norm_layer],
             drop_path_rate=drop_path_rate,
         )
 
