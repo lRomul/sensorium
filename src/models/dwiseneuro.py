@@ -6,6 +6,54 @@ import torch
 from torch import nn
 
 
+class PositionalEncoding3d(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.orig_channels = channels
+        channels = math.ceil(channels / 6) * 2
+        if channels % 2:
+            channels += 1
+        self.channels = channels
+        inv_freq = 1.0 / (10000 ** (torch.arange(0, channels, 2).float() / channels))
+        self.register_buffer("inv_freq", inv_freq)
+        self.register_buffer("cached_encoding", None, persistent=False)
+
+    def get_emb(self, sin_inp):
+        emb = torch.stack((sin_inp.sin(), sin_inp.cos()), dim=0)
+        return torch.flatten(emb, 0, 1)
+
+    def create_cached_encoding(self, tensor):
+        _, orig_ch, x, y, z = tensor.shape
+        assert orig_ch == self.orig_channels
+        self.cached_encoding = None
+        pos_x = torch.arange(x, device=tensor.device).type(self.inv_freq.type())
+        pos_y = torch.arange(y, device=tensor.device).type(self.inv_freq.type())
+        pos_z = torch.arange(z, device=tensor.device).type(self.inv_freq.type())
+        sin_inp_x = torch.einsum("i,j->ij", self.inv_freq, pos_x)
+        sin_inp_y = torch.einsum("i,j->ij", self.inv_freq, pos_y)
+        sin_inp_z = torch.einsum("i,j->ij", self.inv_freq, pos_z)
+        emb_x = self.get_emb(sin_inp_x).unsqueeze(-1).unsqueeze(-1)
+        emb_y = self.get_emb(sin_inp_y).unsqueeze(1).unsqueeze(-1)
+        emb_z = self.get_emb(sin_inp_z).unsqueeze(1).unsqueeze(1)
+        emb = torch.zeros((self.channels * 3, x, y, z), dtype=tensor.dtype, device=tensor.device)
+        emb[:self.channels] = emb_x
+        emb[self.channels: 2 * self.channels] = emb_y
+        emb[2 * self.channels:] = emb_z
+        emb = emb[None, :self.orig_channels].contiguous()
+        self.cached_encoding = emb
+        return emb
+
+    def forward(self, x):
+        if len(x.shape) != 5:
+            raise RuntimeError("The input tensor has to be 5D")
+
+        cached_encoding = self.cached_encoding
+        if cached_encoding is None or cached_encoding.shape[1:] != x.shape[1:]:
+            cached_encoding = self.create_cached_encoding(x)
+
+        return x + cached_encoding.expand_as(x)
+
+
 class BatchNormAct(nn.Module):
     def __init__(self,
                  num_features: int,
@@ -88,6 +136,7 @@ class InvertedResidual3d(nn.Module):
 
         # Point-wise expansion
         self.conv_pw = nn.Sequential(
+            PositionalEncoding3d(in_features),
             nn.Conv3d(in_features, mid_features, (1, 1, 1), bias=bias),
             BatchNormAct(mid_features, bn_layer=bn_layer, act_layer=act_layer),
         )
@@ -142,54 +191,6 @@ class InvertedResidual3d(nn.Module):
         x = self.conv_pwl(x)
         x = self.drop_path(x) + self.interpolate_shortcut(shortcut)
         return x
-
-
-class PositionalEncoding3d(nn.Module):
-    def __init__(self, channels):
-        super().__init__()
-        self.orig_channels = channels
-        channels = math.ceil(channels / 6) * 2
-        if channels % 2:
-            channels += 1
-        self.channels = channels
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, channels, 2).float() / channels))
-        self.register_buffer("inv_freq", inv_freq)
-        self.register_buffer("cached_encoding", None, persistent=False)
-
-    def get_emb(self, sin_inp):
-        emb = torch.stack((sin_inp.sin(), sin_inp.cos()), dim=0)
-        return torch.flatten(emb, 0, 1)
-
-    def create_cached_encoding(self, tensor):
-        _, orig_ch, x, y, z = tensor.shape
-        assert orig_ch == self.orig_channels
-        self.cached_encoding = None
-        pos_x = torch.arange(x, device=tensor.device).type(self.inv_freq.type())
-        pos_y = torch.arange(y, device=tensor.device).type(self.inv_freq.type())
-        pos_z = torch.arange(z, device=tensor.device).type(self.inv_freq.type())
-        sin_inp_x = torch.einsum("i,j->ij", self.inv_freq, pos_x)
-        sin_inp_y = torch.einsum("i,j->ij", self.inv_freq, pos_y)
-        sin_inp_z = torch.einsum("i,j->ij", self.inv_freq, pos_z)
-        emb_x = self.get_emb(sin_inp_x).unsqueeze(-1).unsqueeze(-1)
-        emb_y = self.get_emb(sin_inp_y).unsqueeze(1).unsqueeze(-1)
-        emb_z = self.get_emb(sin_inp_z).unsqueeze(1).unsqueeze(1)
-        emb = torch.zeros((self.channels * 3, x, y, z), dtype=tensor.dtype, device=tensor.device)
-        emb[:self.channels] = emb_x
-        emb[self.channels: 2 * self.channels] = emb_y
-        emb[2 * self.channels:] = emb_z
-        emb = emb[None, :self.orig_channels].contiguous()
-        self.cached_encoding = emb
-        return emb
-
-    def forward(self, x):
-        if len(x.shape) != 5:
-            raise RuntimeError("The input tensor has to be 5D")
-
-        cached_encoding = self.cached_encoding
-        if cached_encoding is None or cached_encoding.shape[1:] != x.shape[1:]:
-            cached_encoding = self.create_cached_encoding(x)
-
-        return x + cached_encoding.expand_as(x)
 
 
 class ShuffleLayer(nn.Module):
@@ -317,7 +318,6 @@ class DepthwiseCore(nn.Module):
             block_drop_path_rate = drop_path_rate * block_index / len(features)
 
             blocks += [
-                PositionalEncoding3d(num_features),
                 InvertedResidual3d(
                     num_features,
                     next_num_features,
@@ -398,7 +398,7 @@ class DwiseNeuro(nn.Module):
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
         x = self.core(x)  # (32, 256, 16, 8, 8)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
-        x = self.cortex(x)  # (16, 8192, 16)
+        x = self.cortex(x)  # (32, 8192, 16)
         if index is None:
             return [readout(x) for readout in self.readouts]
         else:
