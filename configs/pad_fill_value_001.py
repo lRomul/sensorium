@@ -54,7 +54,7 @@ config = dict(
         },
         "inputs_processor": ("stack_inputs", {
             "size": image_size,
-            "pad_fill_value": 0.,
+            "pad_fill_value": 127,
         }),
         "responses_processor": ("identity", {}),
         "amp": True,
