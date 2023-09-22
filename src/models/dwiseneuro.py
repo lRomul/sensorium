@@ -245,7 +245,7 @@ class Cortex(nn.Module):
         super().__init__()
         self.layers = nn.Sequential()
         prev_num_features = in_features
-        for layer_index, num_features in enumerate(features):
+        for num_features in features:
             self.layers.append(
                 ShuffleLayer(
                     in_features=prev_num_features,
@@ -314,7 +314,7 @@ class DepthwiseCore(nn.Module):
             spatial_stride = spatial_strides[block_index]
             if block_index < num_blocks - 1:
                 next_num_features = features[block_index + 1]
-            block_drop_path_rate = drop_path_rate * block_index / len(features)
+            block_drop_path_rate = drop_path_rate * block_index / num_blocks
 
             blocks += [
                 PositionalEncoding3d(num_features),
@@ -398,7 +398,7 @@ class DwiseNeuro(nn.Module):
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
         x = self.core(x)  # (32, 256, 16, 8, 8)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
-        x = self.cortex(x)  # (16, 8192, 16)
+        x = self.cortex(x)  # (32, 8192, 16)
         if index is None:
             return [readout(x) for readout in self.readouts]
         else:
