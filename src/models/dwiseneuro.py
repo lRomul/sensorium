@@ -245,7 +245,7 @@ class Cortex(nn.Module):
         super().__init__()
         self.layers = nn.Sequential()
         prev_num_features = in_features
-        for layer_index, num_features in enumerate(features):
+        for num_features in features:
             self.layers.append(
                 ShuffleLayer(
                     in_features=prev_num_features,
@@ -292,6 +292,7 @@ class DepthwiseCore(nn.Module):
                  in_channels: int = 1,
                  features: tuple[int, ...] = (64, 128, 256, 512),
                  spatial_strides: tuple[int, ...] = (2, 2, 2, 2),
+                 positional_encodings: tuple[bool, ...] = (True, True, True, True),
                  spatial_kernel: int = 3,
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
@@ -301,38 +302,37 @@ class DepthwiseCore(nn.Module):
                  drop_path_rate: float = 0.):
         super().__init__()
         num_blocks = len(features)
-        assert num_blocks and num_blocks == len(spatial_strides)
+        assert num_blocks and num_blocks == len(spatial_strides) == len(positional_encodings)
         next_num_features = features[0]
         self.stem = nn.Sequential(
             nn.Conv3d(in_channels, next_num_features, (1, 1, 1), bias=False),
             BatchNormAct(next_num_features, bn_layer=bn_layer, apply_act=False),
         )
 
-        blocks = []
+        self.blocks = nn.Sequential()
         for block_index in range(num_blocks):
-            num_features = features[block_index]
-            spatial_stride = spatial_strides[block_index]
             if block_index < num_blocks - 1:
                 next_num_features = features[block_index + 1]
-            block_drop_path_rate = drop_path_rate * block_index / len(features)
 
-            blocks += [
-                PositionalEncoding3d(num_features),
+            if positional_encodings[block_index]:
+                self.blocks.append(
+                    PositionalEncoding3d(features[block_index])
+                )
+            self.blocks.append(
                 InvertedResidual3d(
-                    num_features,
+                    features[block_index],
                     next_num_features,
                     spatial_kernel=spatial_kernel,
                     temporal_kernel=temporal_kernel,
-                    spatial_stride=spatial_stride,
+                    spatial_stride=spatial_strides[block_index],
                     expansion_ratio=expansion_ratio,
                     se_reduce_ratio=se_reduce_ratio,
                     act_layer=act_layer,
                     bn_layer=bn_layer,
-                    drop_path_rate=block_drop_path_rate,
+                    drop_path_rate=drop_path_rate * block_index / num_blocks,
                     bias=False,
                 )
-            ]
-        self.blocks = nn.Sequential(*blocks)
+            )
 
     def forward(self, x):
         x = self.stem(x)
@@ -346,6 +346,7 @@ class DwiseNeuro(nn.Module):
                  in_channels: int = 1,
                  core_features: tuple[int, ...] = (64, 128, 256, 512),
                  spatial_strides: tuple[int, ...] = (2, 2, 2, 2),
+                 positional_encodings: tuple[bool, ...] = (True, True, True, True),
                  spatial_kernel: int = 3,
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
@@ -362,6 +363,7 @@ class DwiseNeuro(nn.Module):
             in_channels=in_channels,
             features=core_features,
             spatial_strides=spatial_strides,
+            positional_encodings=positional_encodings,
             spatial_kernel=spatial_kernel,
             temporal_kernel=temporal_kernel,
             expansion_ratio=expansion_ratio,
@@ -398,7 +400,7 @@ class DwiseNeuro(nn.Module):
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
         x = self.core(x)  # (32, 256, 16, 8, 8)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
-        x = self.cortex(x)  # (16, 8192, 16)
+        x = self.cortex(x)  # (32, 8192, 16)
         if index is None:
             return [readout(x) for readout in self.readouts]
         else:
