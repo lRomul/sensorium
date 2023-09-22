@@ -30,7 +30,7 @@ config = dict(
             "spatial_kernel": 3,
             "temporal_kernel": 5,
             "expansion_ratio": 6,
-            "se_reduce_ratio": 32,
+            "se_reduce_ratio": 16,
             "cortex_features": (512 * 2, 1024 * 2, 2048 * 2),
             "groups": 2,
             "softplus_beta": 0.07,
