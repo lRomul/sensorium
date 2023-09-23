@@ -66,6 +66,6 @@ config = dict(
     },
     distill={
         "experiment": "softplus_beta_010",
-        "ratio": 0.5,
+        "ratio": 0.7,
     },
 )
