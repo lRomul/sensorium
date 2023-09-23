@@ -7,6 +7,7 @@ from importlib.machinery import SourceFileLoader
 
 from torch.utils.data import DataLoader
 
+from argus import load_model
 from argus.callbacks import (
     LoggingToFile,
     LoggingToCSV,
@@ -16,10 +17,10 @@ from argus.callbacks import (
 )
 
 from src.datasets import TrainMouseVideoDataset, ValMouseVideoDataset, ConcatMiceVideoDataset
+from src.utils import get_lr, init_weights, get_best_model_path
 from src.responses import get_responses_processor
 from src.ema import ModelEma, EmaCheckpoint
 from src.inputs import get_inputs_processor
-from src.utils import get_lr, init_weights
 from src.metrics import CorrelationMetric
 from src.indexes import IndexesGenerator
 from src.argus_models import MouseModel
@@ -51,6 +52,16 @@ def train_mouse(config: dict, save_dir: Path, train_splits: list[str], val_split
         checkpoint_class = EmaCheckpoint
     else:
         checkpoint_class = Checkpoint
+
+    if "distill" in config:
+        distill_params =  config["distill"]
+        distill_experiment_dir = constants.experiments_dir / distill_params["experiment"] / val_splits[0]
+        distill_model_path = get_best_model_path(distill_experiment_dir)
+        distill_model = load_model(distill_model_path, device=argus_params["device"])
+        distill_model.eval()
+        model.distill_model = distill_model.nn_module
+        model.distill_ratio = distill_params["ratio"]
+        print(f"Distillation model {str(distill_model_path)}, ratio {model.distill_ratio}")
 
     indexes_generator = IndexesGenerator(**argus_params["frame_stack"])
     inputs_processor = get_inputs_processor(*argus_params["inputs_processor"])

@@ -25,6 +25,20 @@ class MouseModel(argus.Model):
         self.amp = bool(params.get('amp', False))
         self.grad_scaler = torch.cuda.amp.GradScaler(enabled=self.amp)
         self.model_ema: ModelEma | None = None
+        self.distill_model: torch.nn.Module | None = None
+        self.distill_ratio: float = 0.
+
+    @torch.no_grad()
+    def add_distill_predictions(self, input, target):
+        if self.distill_model is not None and self.distill_ratio:
+            distill_prediction = self.distill_model(input)
+            target_tensors, mice_weights = target
+            distill_mask = mice_weights == 0.
+            distill_weight = (self.distill_ratio / (1. - self.distill_ratio)
+                              * mice_weights.sum() / distill_mask.sum())
+            for batch_idx, mouse_idx in torch.argwhere(distill_mask):
+                target_tensors[mouse_idx][batch_idx] = distill_prediction[mouse_idx][batch_idx]
+                mice_weights[batch_idx, mouse_idx] = distill_weight
 
     def train_step(self, batch, state: State) -> dict:
         self.train()
@@ -34,6 +48,7 @@ class MouseModel(argus.Model):
         for i, chunk_batch in enumerate(deep_chunk(batch, self.iter_size)):
             input, target = deep_to(chunk_batch, self.device, non_blocking=True)
             with torch.cuda.amp.autocast(enabled=self.amp):
+                self.add_distill_predictions(input, target)
                 prediction = self.nn_module(input)
                 loss = self.loss(prediction, target)
                 loss = loss / self.iter_size
