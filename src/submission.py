@@ -32,14 +32,14 @@ def evaluate_folds_predictions(experiment: str, dataset: str):
             target = cut_responses_for_submission(target)
             predictions.append(prediction)
             targets.append(target)
-        correlation = corr(
+        correlation = float(corr(
             np.concatenate(predictions, axis=1),
             np.concatenate(targets, axis=1),
             axis=1
-        ).mean()
+        ).mean())
         print(f"Mouse {mouse} correlation: {correlation}")
         correlations[mouse] = correlation
-    mean_correlation = np.mean(list(correlations.values()))
+    mean_correlation = float(np.mean(list(correlations.values())))
     print("Mean correlation:", mean_correlation)
 
     evaluate_result = {"correlations": correlations, "mean_correlation": mean_correlation}
