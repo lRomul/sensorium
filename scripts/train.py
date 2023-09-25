@@ -1,3 +1,4 @@
+import time
 import copy
 import json
 import argparse
@@ -5,6 +6,7 @@ from pathlib import Path
 from pprint import pprint
 from importlib.machinery import SourceFileLoader
 
+import torch
 from torch.utils.data import DataLoader
 
 from argus.callbacks import (
@@ -171,3 +173,6 @@ if __name__ == "__main__":
         print(f"Val fold: {val_folds_splits}, train folds: {train_folds_splits}")
         print(f"Fold experiment dir: {fold_experiment_dir}")
         train_mouse(train_config, fold_experiment_dir, train_folds_splits, val_folds_splits)
+
+        torch.cuda.empty_cache()
+        time.sleep(12)
