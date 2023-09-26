@@ -280,8 +280,6 @@ class Readout(nn.Module):
                  in_features: int,
                  out_features: int,
                  groups: int = 1,
-                 softplus_beta: float = 1.,
-                 softplus_gamma: float = math.e,
                  drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
@@ -291,12 +289,10 @@ class Readout(nn.Module):
                       math.ceil(out_features / groups) * groups, (1,),
                       groups=groups, bias=True),
         )
-        self.gate = LearnableSoftplus(beta=softplus_beta, gamma=softplus_gamma)
 
     def forward(self, x):
         x = self.layer(x)
         x = x[:, :self.out_features]
-        x = self.gate(x)
         return x
 
 
@@ -406,11 +402,10 @@ class DwiseNeuro(nn.Module):
                     in_features=cortex_features[-1],
                     out_features=readout_output,
                     groups=groups,
-                    softplus_beta=softplus_beta,
-                    softplus_gamma=softplus_gamma,
                     drop_rate=drop_rate,
                 )
             )
+        self.gate = LearnableSoftplus(beta=softplus_beta, gamma=softplus_gamma)
 
     def forward(self, x: torch.Tensor, index: int | None = None) -> list[torch.Tensor] | torch.Tensor:
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
@@ -418,6 +413,6 @@ class DwiseNeuro(nn.Module):
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
         x = self.cortex(x)  # (32, 8192, 16)
         if index is None:
-            return [readout(x) for readout in self.readouts]
+            return [self.gate(readout(x)) for readout in self.readouts]  # [(32, neurons, 16), ...]
         else:
-            return self.readouts[index](x)  # (32, neurons, 16)
+            return self.gate(self.readouts[index](x))  # (32, neurons, 16)
