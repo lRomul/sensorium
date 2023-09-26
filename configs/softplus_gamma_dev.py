@@ -1,3 +1,5 @@
+import math
+
 from src.utils import get_lr
 from src import constants
 
@@ -35,6 +37,7 @@ config = dict(
             "cortex_features": (512 * 2, 1024 * 2, 2048 * 2),
             "groups": 2,
             "softplus_beta": 0.07,
+            "softplus_gamma": math.e,
             "drop_rate": 0.2,
             "drop_path_rate": 0.2,
         }),

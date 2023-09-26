@@ -263,12 +263,25 @@ class Cortex(nn.Module):
         return x
 
 
+class LearnableSoftplus(nn.Module):
+    def __init__(self, beta: float = 1., gamma: float = math.e):
+        super().__init__()
+        self.beta = nn.Parameter(torch.tensor(float(beta)))
+        self.gamma = nn.Parameter(torch.tensor(float(gamma)))
+
+    def forward(self, x):
+        xb = x * self.beta
+        x = (self.gamma ** torch.minimum(xb, -xb) + 1).log()
+        return (torch.clamp(xb, 0) + x / torch.log(self.gamma)) / self.beta
+
+
 class Readout(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
                  groups: int = 1,
-                 softplus_beta: int = 1,
+                 softplus_beta: float = 1.,
+                 softplus_gamma: float = math.e,
                  drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
@@ -278,7 +291,7 @@ class Readout(nn.Module):
                       math.ceil(out_features / groups) * groups, (1,),
                       groups=groups, bias=True),
         )
-        self.gate = nn.Softplus(beta=softplus_beta)
+        self.gate = LearnableSoftplus(beta=softplus_beta, gamma=softplus_gamma)
 
     def forward(self, x):
         x = self.layer(x)
@@ -354,7 +367,8 @@ class DwiseNeuro(nn.Module):
                  se_reduce_ratio: int = 16,
                  cortex_features: tuple[int, ...] = (4096, 4096),
                  groups: int = 4,
-                 softplus_beta: int = 1,
+                 softplus_beta: float = 1.,
+                 softplus_gamma: float = math.e,
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
@@ -393,6 +407,7 @@ class DwiseNeuro(nn.Module):
                     out_features=readout_output,
                     groups=groups,
                     softplus_beta=softplus_beta,
+                    softplus_gamma=softplus_gamma,
                     drop_rate=drop_rate,
                 )
             )
