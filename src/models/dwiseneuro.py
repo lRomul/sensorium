@@ -145,14 +145,14 @@ class InvertedResidual3d(nn.Module):
 
 
 class PositionalEncoding3d(nn.Module):
-    def __init__(self, channels):
+    def __init__(self, channels: int, freq_factor: int = 10000):
         super().__init__()
         self.orig_channels = channels
         channels = math.ceil(channels / 6) * 2
         if channels % 2:
             channels += 1
         self.channels = channels
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, channels, 2).float() / channels))
+        inv_freq = 1.0 / (freq_factor ** (torch.arange(0, channels, 2).float() / channels))
         self.register_buffer("inv_freq", inv_freq)
         self.register_buffer("cached_encoding", None, persistent=False)
 
@@ -296,6 +296,7 @@ class DepthwiseCore(nn.Module):
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
                  se_reduce_ratio: int = 16,
+                 enc_freq_factor: int = 10000,
                  act_layer: Callable = nn.ReLU,
                  bn_layer: Callable = nn.BatchNorm3d,
                  drop_path_rate: float = 0.):
@@ -317,7 +318,7 @@ class DepthwiseCore(nn.Module):
             block_drop_path_rate = drop_path_rate * block_index / num_blocks
 
             blocks += [
-                PositionalEncoding3d(num_features),
+                PositionalEncoding3d(num_features, freq_factor=enc_freq_factor),
                 InvertedResidual3d(
                     num_features,
                     next_num_features,
@@ -349,6 +350,7 @@ class DwiseNeuro(nn.Module):
                  spatial_kernel: int = 3,
                  temporal_kernel: int = 3,
                  expansion_ratio: int = 3,
+                 enc_freq_factor: int = 10000,
                  se_reduce_ratio: int = 16,
                  cortex_features: tuple[int, ...] = (4096, 4096),
                  groups: int = 4,
@@ -365,6 +367,7 @@ class DwiseNeuro(nn.Module):
             spatial_kernel=spatial_kernel,
             temporal_kernel=temporal_kernel,
             expansion_ratio=expansion_ratio,
+            enc_freq_factor=enc_freq_factor,
             se_reduce_ratio=se_reduce_ratio,
             act_layer=act_layer,
             bn_layer=nn.BatchNorm3d,
