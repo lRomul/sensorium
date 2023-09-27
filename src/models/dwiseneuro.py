@@ -263,12 +263,23 @@ class Cortex(nn.Module):
         return x
 
 
+class LearnableSoftplus(nn.Module):
+    def __init__(self, beta: float):
+        super().__init__()
+        self.beta = nn.Parameter(torch.tensor(float(beta)))
+        self.gamma = nn.Parameter(torch.tensor(1. / float(beta)))
+
+    def forward(self, x):
+        xb = x * self.beta
+        return (torch.clamp(xb, 0) + torch.minimum(xb, -xb).exp().log1p()) * self.gamma
+
+
 class Readout(nn.Module):
     def __init__(self,
                  in_features: int,
                  out_features: int,
                  groups: int = 1,
-                 softplus_beta: int = 1,
+                 softplus_beta: float = 1.,
                  drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
@@ -278,7 +289,7 @@ class Readout(nn.Module):
                       math.ceil(out_features / groups) * groups, (1,),
                       groups=groups, bias=True),
         )
-        self.gate = nn.Softplus(beta=softplus_beta)
+        self.gate = LearnableSoftplus(beta=softplus_beta)
 
     def forward(self, x):
         x = self.layer(x)
@@ -352,7 +363,7 @@ class DwiseNeuro(nn.Module):
                  se_reduce_ratio: int = 16,
                  cortex_features: tuple[int, ...] = (4096, 4096),
                  groups: int = 4,
-                 softplus_beta: int = 1,
+                 softplus_beta: float = 1.,
                  drop_rate: float = 0.,
                  drop_path_rate: float = 0.):
         super().__init__()
