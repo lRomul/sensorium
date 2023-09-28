@@ -34,8 +34,8 @@ config = dict(
             "cortex_features": (512 * 2, 1024 * 2, 2048 * 2),
             "groups": 2,
             "softplus_beta": 0.07,
-            "drop_rate": 0.25,
-            "drop_path_rate": 0.25,
+            "drop_rate": 0.5,
+            "drop_path_rate": 0.1,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
