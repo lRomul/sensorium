@@ -112,7 +112,7 @@ def train_mouse(config: dict, save_dir: Path, train_splits: list[str], val_split
                 LambdaLR(lambda x: x / num_iterations,
                          step_on_iteration=True),
             ]
-        elif stage == "train":
+        elif stage == "cosine":
             checkpoint_format = "model-{epoch:03d}-{val_corr:.6f}.pth"
             callbacks += [
                 checkpoint_class(save_dir, file_format=checkpoint_format, max_saves=1),
