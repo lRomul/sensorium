@@ -3,7 +3,7 @@ from src import constants
 
 
 image_size = (64, 64)
-batch_size = 32
+batch_size = 28
 base_lr = 3e-4
 frame_stack_size = 16
 config = dict(
@@ -21,21 +21,21 @@ config = dict(
         "nn_module": ("dwiseneuro", {
             "readout_outputs": constants.num_neurons,
             "in_channels": 5,
-            "core_features": (64, 64, 64, 64,
+            "core_features": (64, 64, 64, 64, 64,
                               128, 128, 128,
                               256, 256),
-            "spatial_strides": (2, 1, 1, 1,
+            "spatial_strides": (2, 1, 1, 1, 1,
                                 2, 1, 1,
                                 2, 1),
             "spatial_kernel": 3,
             "temporal_kernel": 5,
-            "expansion_ratio": 8,
+            "expansion_ratio": 7,
             "se_reduce_ratio": 32,
             "cortex_features": (512 * 2, 1024 * 2, 2048 * 2),
             "groups": 2,
             "softplus_beta": 0.07,
-            "drop_rate": 0.4,
-            "drop_path_rate": 0.1,
+            "drop_rate": 0.42,
+            "drop_path_rate": 0.12,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
@@ -58,7 +58,7 @@ config = dict(
         }),
         "responses_processor": ("identity", {}),
         "amp": True,
-        "iter_size": 4,
+        "iter_size": 2,
     },
     cutmix={
         "alpha": 1.0,
