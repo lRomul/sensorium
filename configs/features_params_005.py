@@ -29,7 +29,7 @@ config = dict(
                                 2, 1),
             "spatial_kernel": 3,
             "temporal_kernel": 5,
-            "expansion_ratio": 7,
+            "expansion_ratio": 8,
             "se_reduce_ratio": 32,
             "cortex_features": (512 * 2, 1024 * 2, 2048 * 2),
             "groups": 2,
@@ -58,7 +58,7 @@ config = dict(
         }),
         "responses_processor": ("identity", {}),
         "amp": True,
-        "iter_size": 2,
+        "iter_size": 4,
     },
     cutmix={
         "alpha": 1.0,
