@@ -3,7 +3,7 @@ from src import constants
 
 
 image_size = (64, 64)
-batch_size = 32
+batch_size = 16
 base_lr = 3e-4
 frame_stack_size = 16
 config = dict(
@@ -58,7 +58,7 @@ config = dict(
         }),
         "responses_processor": ("identity", {}),
         "amp": True,
-        "iter_size": 2,
+        "iter_size": 1,
     },
     cutmix={
         "alpha": 1.0,
