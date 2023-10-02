@@ -36,7 +36,6 @@ class MouseModel(argus.Model):
             with torch.cuda.amp.autocast(enabled=self.amp):
                 prediction = self.nn_module(input)
                 loss = self.loss(prediction, target)
-                loss = loss / self.iter_size
             self.grad_scaler.scale(loss).backward()
             loss_value += loss.item()
 
