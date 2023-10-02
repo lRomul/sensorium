@@ -36,6 +36,7 @@ config = dict(
             "softplus_beta": 0.07,
             "drop_rate": 0.4,
             "drop_path_rate": 0.1,
+            "bn_momentum": 0.01,
         }),
         "loss": ("mice_poisson", {
             "log_input": False,
