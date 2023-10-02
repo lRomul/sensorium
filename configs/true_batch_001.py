@@ -58,7 +58,7 @@ config = dict(
         }),
         "responses_processor": ("identity", {}),
         "amp": True,
-        "iter_size": 2,
+        "iter_size": 1,
     },
     cutmix={
         "alpha": 1.0,
