@@ -49,5 +49,6 @@ num_folds = 7
 folds = list(range(num_folds))
 folds_splits = [f"fold_{fold}" for fold in folds]
 
+submission_limit_length = 300
 submission_skip_first = 50
 submission_skip_last = 1

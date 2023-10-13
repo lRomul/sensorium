@@ -10,6 +10,7 @@ from src import constants
 
 
 def cut_responses_for_submission(prediction: np.ndarray):
+    prediction = prediction[..., :constants.submission_limit_length]
     prediction = prediction[..., constants.submission_skip_first:]
     if constants.submission_skip_last:
         prediction = prediction[..., :-constants.submission_skip_last]
