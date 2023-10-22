@@ -1,5 +1,7 @@
 # Solution for Sensorium 2023 Competition
 
+![header](data/readme_images/header.png)
+
 This repository contains the code to reproduce the solution to the Sensorium 2023, part of the NeurIPS 2023 competition track.
 The competition aims to find the best model that can predict the activity of thousands of neurons in the primary visual cortex of mice in response to videos.
 Using dynamic stimuli (videos) instead of static stimuli (images) like in the previous Sensorium competition added a temporal component, making the task much more difficult.
@@ -19,7 +21,7 @@ One important note to the paper is that additional data for five mice appeared, 
 
 Pipeline tuned for training on a single RTX A6000 with 48 GB.
 In the case of GPU with less memory, you can use gradient accumulation by increasing the `iter_size` parameter in training configs.
-It will worsen the result (by a 0.002 score for `iter_size==2`), but it has less than the effect of reducing the batch size.
+It will worsen the result (by a 0.002 score for `"iter_size": 2`), but it has less than the effect of reducing the batch size.
 
 ### Run
 
