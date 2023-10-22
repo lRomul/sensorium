@@ -1,5 +1,12 @@
 # Solution for Sensorium 2023 Competition
 
+This repository contains the code to reproduce the solution to the Sensorium 2023, part of the NeurIPS 2023 competition track.
+The competition aims to find the best model that can predict the activity of thousands of neurons in the primary visual cortex of mice in response to videos.
+Using dynamic stimuli (videos) instead of static stimuli (images) like in the previous Sensorium competition added a temporal component, making the task much more difficult.
+
+See more about data and the challenge in the [whitepaper](https://arxiv.org/abs/2305.19654).
+One important note to the paper is that additional data for five mice appeared, doubling the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
+
 ## Quick setup and start
 
 ### Requirements
@@ -10,7 +17,7 @@
 * [Docker](https://docs.docker.com/engine/install/)
 * [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
 
-Pipeline tuned for training on RTX A6000 with 48 GB.
+Pipeline tuned for training on a single RTX A6000 with 48 GB.
 In the case of GPU with less memory, you can use gradient accumulation by increasing the `iter_size` parameter in training configs.
 It will worsen the result (by a 0.002 score for `iter_size==2`), but it has less than the effect of reducing the batch size.
 
