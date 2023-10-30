@@ -2,12 +2,21 @@
 
 ![header](data/readme_images/header.png)
 
-This repository contains the code to reproduce the solution to the Sensorium 2023, part of the NeurIPS 2023 competition track.
+This repository contains the code to reproduce the winning solution to the Sensorium 2023, part of the NeurIPS 2023 competition track.
 The competition aims to find the best model that can predict the activity of thousands of neurons in the primary visual cortex of mice in response to videos.
 Using dynamic stimuli (videos) instead of static stimuli (images) like in the previous Sensorium competition added a temporal component, making the task much more difficult.
 
 See more about data and the challenge in the [whitepaper](https://arxiv.org/abs/2305.19654).
-One important note to the paper is that additional data for five mice appeared, doubling the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
+One important note to the paper is that additional data for five mice appeared during competition, doubling the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
+
+## Solution
+
+Key points:
+* DwiseNeuro - novel model architecture for prediction neural activity in the mouse primary visual cortex
+* Solid cross-validation strategy with splitting folds by perceptual video hash
+* Training on all mice with an option to fill unlabeled samples via distillation
+
+Detailed solution write-up is coming soon!
 
 ## Quick setup and start
 
@@ -75,8 +84,8 @@ python scripts/download_data.py
 You can now reproduce the final results of the solution using the following commands:
 ```bash
 # Train
-# 3.5 days (12 hours per fold) is the training time for each experiment on a single A6000
-# You can speed up the process by parallel folds training on different GPUs using --folds script argument
+# The training time is 3.5 days (12 hours per fold) for each experiment on a single A6000
+# You can speed up the process by using the --folds argument to train folds in parallel
 # Or just download trained weights in the section below
 python scripts/train.py -e true_batch_001
 python scripts/train.py -e distillation_001
@@ -104,7 +113,7 @@ cd data/predictions/distillation_001,true_batch_001
 
 ### Trained model weights
 
-You can skip the training step by downloading model weights (9.5 GB) using any BitTorrent client via [torrent file](data/experiments.torrent).  
+You can skip the training step by downloading model weights (9.5 GB) using [torrent file](data/experiments.torrent).  
 
 Place the files in the data directory so that the folder structure is as follows:
 
