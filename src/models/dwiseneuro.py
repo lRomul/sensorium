@@ -398,7 +398,7 @@ class DwiseNeuro(nn.Module):
         # Input shape: (batch, channel, time, height, width), e.g. (32, 5, 16, 64, 64)
         x = self.core(x)  # (32, 256, 16, 8, 8)
         x = self.pool(x).squeeze(-1).squeeze(-1)  # (32, 256, 16)
-        x = self.cortex(x)  # (32, 8192, 16)
+        x = self.cortex(x)  # (32, 4096, 16)
         if index is None:
             return [readout(x) for readout in self.readouts]
         else:

@@ -18,6 +18,10 @@ Key points:
 
 Detailed solution write-up is coming soon!
 
+## Architecture
+
+![architecture](data/readme_images/architecture.png)
+
 ## Quick setup and start
 
 ### Requirements
