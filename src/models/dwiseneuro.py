@@ -343,18 +343,18 @@ class DepthwiseCore(nn.Module):
 class DwiseNeuro(nn.Module):
     def __init__(self,
                  readout_outputs: tuple[int, ...],
-                 in_channels: int = 1,
-                 core_features: tuple[int, ...] = (64, 128, 256, 512),
-                 spatial_strides: tuple[int, ...] = (2, 2, 2, 2),
+                 in_channels: int = 5,
+                 core_features: tuple[int, ...] = (64, 64, 64, 64, 128, 128, 128, 256, 256),
+                 spatial_strides: tuple[int, ...] = (2, 1, 1, 1, 2, 1, 1, 2, 1),
                  spatial_kernel: int = 3,
-                 temporal_kernel: int = 3,
-                 expansion_ratio: int = 3,
-                 se_reduce_ratio: int = 16,
-                 cortex_features: tuple[int, ...] = (4096, 4096),
-                 groups: int = 4,
-                 softplus_beta: int = 1,
-                 drop_rate: float = 0.,
-                 drop_path_rate: float = 0.):
+                 temporal_kernel: int = 5,
+                 expansion_ratio: int = 6,
+                 se_reduce_ratio: int = 32,
+                 cortex_features: tuple[int, ...] = (1024, 2048, 4096),
+                 groups: int = 2,
+                 softplus_beta: int = 0.07,
+                 drop_rate: float = 0.4,
+                 drop_path_rate: float = 0.1):
         super().__init__()
         act_layer = functools.partial(nn.SiLU, inplace=True)
 
