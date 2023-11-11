@@ -6,7 +6,7 @@ This repository contains the code to reproduce the winning solution to the Senso
 The competition aims to find the best model that can predict the activity of thousands of neurons in the primary visual cortex of mice in response to videos.
 Using dynamic stimuli (videos) instead of static stimuli (images) like in the previous Sensorium competition added a temporal component, making the task much more difficult.
 
-See more about data and the challenge in the [whitepaper](https://arxiv.org/abs/2305.19654).
+See more about data and the challenge in the [whitepaper](https://arxiv.org/abs/2305.19654).  
 One important note to the paper is that additional data for five mice appeared during competition, doubling the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
 
 ## Solution
@@ -16,11 +16,56 @@ Key points:
 * Solid cross-validation strategy with splitting folds by perceptual video hash
 * Training on all mice with an option to fill unlabeled samples via distillation
 
-Detailed solution write-up is coming soon!
-
 ## Architecture
 
+During the competition, I dedicated most of my time to designing the model architecture since it significantly impacted the solution's outcome compared to other components.
+A good starting point for model development was a core made up of blocks similar to blocks from EfficientNet but rewritten in 3D layers. 
+I iteratively tested various computer vision and deep learning techniques, integrating them into the architecture as the correlation metric improved.
+
+The diagram below illustrates the final architecture, which I named DwiseNeuro:
+
 ![architecture](data/readme_images/architecture.png)
+
+DwiseNeuro consists of three main parts: core, cortex, and readouts.
+The core consumes sequences of video frames and mouse behavior activity in separate channels, processing temporal and spatial features.
+Produced features pass through global pooling over spatial dimensions to aggregate them.
+The cortex processes the pooled features independently for each timestep, significantly increasing the channels.
+Finally, each readout predicts the activation of neurons for the corresponding mouse.
+
+In the following sections, we will delve deeper into each part of the architecture.
+
+### Core
+* Stem
+* Inverted Residual 3D Block
+  * Factorized depth-wise convolution (R(2+1)D, CSN)
+  * SqueezeExcite3d
+  * Drop path  
+  * Shortcut (interpolate spatial, tile channels, batch norm)
+* EfficientNet scaling
+* PositionalEncoding3d before each block  
+* Global pooling of spatial dimensions
+
+### Cortex
+* Conv1d with kernel size 1 is a parallel linear layers
+* Channel Shuffle
+* Drop path  
+* Shortcut (tile channels, batch norm)
+
+### Readout
+* Dropout1d
+* One layers conv1d with kernel size 1
+* Softplus, tuning beta, trainable
+
+## Training
+* CutMix
+* MicePoissonLoss, all mice in batch
+* Fill unlabeled samples via distillation
+* 7k fold Cross-validation  
+* Split folds by videos perceptual hashes 
+
+## Prediction
+* Predict each frame, mean blending overlaps
+* Mean blend folds
 
 ## Quick setup and start
 
