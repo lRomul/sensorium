@@ -55,17 +55,29 @@ Obviously, it is almost impossible to start experiments with optimal values.
 The problem is mentioned in the EfficientNet [3] paper, which concluded that it is essential to carefully balance model width, depth, and resolution.
 
 After conducting a lot of experiments, I chose the following parameters:
-* Four blocks with 64 output channels, three with 128, and two with 256
-* Three blocks have stride two. They are the first in each subgroup from the point above
-* Expansion ratio of the inverted residual block is six
-* Kernel of spatial depth-wise convolution is (1, 3, 3)
-* Kernel of temporal depth-wise convolution is (5, 1, 1)
+* Four blocks with 64 output channels, three with 128, and two with 256.
+* Three blocks have stride two. They are the first in each subgroup from the point above.
+* Expansion ratio of the inverted residual block is six.
+* Kernel of spatial depth-wise convolution is (1, 3, 3).
+* Kernel of temporal depth-wise convolution is (5, 1, 1).
 
 ### Cortex
-* Conv1d with kernel size 1 is a parallel linear layers
-* Channel Shuffle
-* Drop path  
-* Shortcut (tile channels, batch norm)
+
+Compared with earlier works [10], I added a new part of the architecture - the cortex.
+It is also common for all mice as the core.
+The cortex receives features that have only channels and temporal dimensions.
+Spatial information was accumulated thanks to position encoding previously applied in the core and compressed by average pooling after the core.
+The primary purpose of the cortex is to smoothly increase the number of channels, which the readouts will further use.
+
+The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [11]. Shortcut connections with stochastic depth similar to the core are also applied.
+
+Hyperparameters of the cortex were also important:
+* Convolution with two groups and kernel size one. Bigger kernel size over temporal dimension has not led to better results.
+* Three layers with 1024, 2048, and 4096 channels.
+
+As you can see, the number of channels is quite large.
+Groups help optimize computation and memory efficiency.
+Channel shuffle operation allows the sharing of information between groups of different layers.
 
 ### Readout
 * Dropout1d
@@ -92,6 +104,8 @@ After conducting a lot of experiments, I chose the following parameters:
 [7] Squeeze-and-Excitation https://arxiv.org/abs/1709.01507
 [8] DropPath https://arxiv.org/abs/1605.07648v4
 [9] Stochastic Depth https://arxiv.org/abs/1603.09382
+[10] Generalization in data-driven models of primary visual cortex https://openreview.net/forum?id=Tp7kI90Htd
+[11] ShuffleNet https://arxiv.org/abs/1707.01083v2
 
 ## Quick setup and start
 
