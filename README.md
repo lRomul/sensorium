@@ -4,7 +4,7 @@
 
 This repository contains the code to reproduce the winning solution to the Sensorium 2023, part of the NeurIPS 2023 competition track.
 The competition aims to find the best model that can predict the activity of neurons in the primary visual cortex of mice in response to videos.
-The competition introduced a temporal component using dynamic stimuli (videos) instead of static stimuli (images) in Sensorium 2022, making the task more challenging.
+The competition introduced a temporal component using dynamic stimuli (videos) instead of static stimuli (images) used in Sensorium 2022, making the task more challenging.
 
 You can read about the competition in the [paper](https://arxiv.org/abs/2305.19654) [1].
 One important note to the paper is that additional data for five mice appeared during competition, doubling the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
@@ -37,7 +37,10 @@ In the following sections, we will delve deeper into each part of the architectu
 
 The first layer of the module is the stem. It's a point-wise convolution for increasing the number of channels, followed by batch normalization.
 The rest of the core consists of inverted residual blocks [2, 3] with a `narrow -> wide -> narrow` channel structure. 
-Several methods were added to it:
+
+#### Techniques
+
+Several methods were added to the core:
 * **Absolute Position Encoding** [4] - summing the encoding to the input of each block allows convolutions to accumulate position information. It's quite important because of the subsequent spatial pooling after the core.
 * **Factorized (2+1)D convolution** [5] - 3D depth-wise convolution was replaced with a spatial 2D depth-wise convolution followed by a temporal 1D depth-wise convolution. There are spatial convolutions with stride two in some blocks to compress output size.
 * **Shortcut Connections** - completely parameter-free residual shortcuts. 
@@ -63,13 +66,15 @@ After conducting a lot of experiments, I chose the following parameters:
 
 ### Cortex
 
-Compared with earlier works [10], I added a new part of the architecture - the cortex.
+Compared with related works [10], I added a new part of the architecture - the cortex.
 It is also common for all mice as the core.
 The cortex receives features that have only channels and temporal dimensions.
 Spatial information was accumulated thanks to position encoding previously applied in the core and compressed by average pooling after the core.
 The primary purpose of the cortex is to smoothly increase the number of channels, which the readouts will further use.
 
 The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [11]. Shortcut connections with stochastic depth similar to the core are also applied.
+
+#### Cortex Scaling
 
 Hyperparameters of the cortex were also important:
 * Convolution with two groups and kernel size one. Bigger kernel size over temporal dimension has not led to better results.
@@ -79,10 +84,44 @@ As you can see, the number of channels is quite large.
 Groups help optimize computation and memory efficiency.
 Channel shuffle operation allows the sharing of information between groups of different layers.
 
-### Readout
-* Dropout1d
-* One layers conv1d with kernel size 1
-* Softplus, tuning beta, trainable
+### Readouts
+
+Each readout is a single 1D convolutional similar to convolutions from the cortex, followed by Softplus activation.
+Each of the ten mice has its readout with the number of output channels equal to the number of neurons (7863, 7908, 8202, 7939, 8122, 7440, 7928, 8285, 7671, 7495, respectively).
+
+#### Softplus
+
+Keeping the response positive by using Softplus was crucial in my pipeline.
+It works much better than `ELU + 1` [10], especially if you tune the Softplus beta parameter.
+In my case, the optimal beta value was about 0.07.
+The optimal value can depend on target normalization.
+I didn't use any normalization for target and input tensors during the training.
+
+![softplus](data/readme_images/softplus.png)
+
+#### Learnable Softplus
+
+I also conducted an experiment where I made the beta parameter trainable.
+Interestingly, the trained value converged approximately to the optimal, which I found by grid search.
+I omitted the learnable Softplus from the solution because it resulted in a slightly worse score.
+But this may be an excellent way to quickly and automatically find the optimal beta.
+
+Here's a numerical stable implementation of learnable Softplus in PyTorch:
+
+```Python
+import torch
+from torch import nn
+
+
+class LearnableSoftplus(nn.Module):
+    def __init__(self, beta: float):
+        super().__init__()
+        self.beta = nn.Parameter(torch.tensor(float(beta)))
+
+    def forward(self, x):
+        xb = x * self.beta
+        return (torch.clamp(xb, 0) + torch.minimum(xb, -xb).exp().log1p()) / self.beta
+```
 
 ## Training
 * CutMix
@@ -95,17 +134,17 @@ Channel shuffle operation allows the sharing of information between groups of di
 * Predict each frame, mean blending overlaps
 * Mean blend folds
 
-[1] Dynamic Sensorium competition https://arxiv.org/abs/2305.19654
-[2] MobileNetV2 https://arxiv.org/abs/1801.04381
-[3] EfficientNet https://arxiv.org/abs/1905.11946
-[4] Attention Is All You Need https://arxiv.org/abs/1706.03762
-[5] R(2+1)D https://arxiv.org/abs/1711.11248v3
-[6] ResNet https://arxiv.org/abs/1512.03385
-[7] Squeeze-and-Excitation https://arxiv.org/abs/1709.01507
-[8] DropPath https://arxiv.org/abs/1605.07648v4
-[9] Stochastic Depth https://arxiv.org/abs/1603.09382
-[10] Generalization in data-driven models of primary visual cortex https://openreview.net/forum?id=Tp7kI90Htd
-[11] ShuffleNet https://arxiv.org/abs/1707.01083v2
+[1] Dynamic Sensorium competition https://arxiv.org/abs/2305.19654  
+[2] MobileNetV2 https://arxiv.org/abs/1801.04381  
+[3] EfficientNet https://arxiv.org/abs/1905.11946  
+[4] Attention Is All You Need https://arxiv.org/abs/1706.03762  
+[5] R(2+1)D https://arxiv.org/abs/1711.11248v3  
+[6] ResNet https://arxiv.org/abs/1512.03385  
+[7] Squeeze-and-Excitation https://arxiv.org/abs/1709.01507  
+[8] DropPath https://arxiv.org/abs/1605.07648v4  
+[9] Stochastic Depth https://arxiv.org/abs/1603.09382  
+[10] Generalization in data-driven models of primary visual cortex https://openreview.net/forum?id=Tp7kI90Htd  
+[11] ShuffleNet https://arxiv.org/abs/1707.01083v2  
 
 ## Quick setup and start
 
