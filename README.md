@@ -3,10 +3,10 @@
 ![header](data/readme_images/header.png)
 
 This repository contains the code to reproduce the winning solution to the Sensorium 2023, part of the NeurIPS 2023 competition track.
-The competition aims to find the best model that can predict the activity of thousands of neurons in the primary visual cortex of mice in response to videos.
+The competition aims to find the best model that can predict the activity of neurons in the primary visual cortex of mice in response to videos.
 The competition introduced a temporal component using dynamic stimuli (videos) instead of static stimuli (images) in Sensorium 2022, making the task more challenging.
 
-See more about data and the challenge in the [paper](https://arxiv.org/abs/2305.19654) [1].
+You can read about the competition in the [paper](https://arxiv.org/abs/2305.19654) [1].
 One important note to the paper is that additional data for five mice appeared during competition, doubling the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
 
 ## Solution
@@ -19,7 +19,6 @@ Key points:
 ## Model Architecture
 
 During the competition, I dedicated most of my time to designing the model architecture since it significantly impacted the solution's outcome compared to other components.
-A good starting point for model development was a core made up of blocks similar to blocks from EfficientNet [2] but rewritten in 3D layers. 
 I iteratively tested various computer vision and deep learning techniques, integrating them into the architecture as the correlation metric improved.
 
 The diagram below illustrates the final architecture, which I named DwiseNeuro:
@@ -37,29 +36,30 @@ In the following sections, we will delve deeper into each part of the architectu
 ### Core
 
 The first layer of the module is the stem. It's a point-wise convolution for increasing the number of channels, followed by batch normalization.
-The rest of the core consists of inverted residual blocks [3] with a `narrow -> wide -> narrow` channel structure. 
+The rest of the core consists of inverted residual blocks [2, 3] with a `narrow -> wide -> narrow` channel structure. 
 Several methods were added to it:
 * **Absolute Position Encoding** [4] - summing the encoding to the input of each block allows convolutions to accumulate position information. It's quite important because of the subsequent spatial pooling after the core.
-* **Factorized (2+1)D convolution** [5] - 3D depth-wise convolution was replaced with a spatial 2D depth-wise convolution followed by a temporal 1D depth-wise convolution. There are spatial convolutions with stride two in some blocks to compress output size. Factorization helped not only improve the result but also reduce computations.
+* **Factorized (2+1)D convolution** [5] - 3D depth-wise convolution was replaced with a spatial 2D depth-wise convolution followed by a temporal 1D depth-wise convolution. There are spatial convolutions with stride two in some blocks to compress output size.
 * **Shortcut Connections** - completely parameter-free residual shortcuts. 
     * Identity mapping if input and output dimensions are equal. It's the same as the connection proposed in ResNet [6].
-    * Nearest interpolation in case of different spatial sizes due to stride. 
+    * Nearest interpolation in case of different spatial sizes. 
     * Cycling repeating of channels if they don't match.
 * **Squeeze-and-Excitation** [7] - dynamic channel-wise feature recalibration.
 * **DropPath** [8, 9] - regularization that randomly drops the block's main path for each sample in batch.
 
-#### Model Scaling
+#### Core Scaling
 
-I found that the number of blocks and their parameters dramatically affect the outcome. It's possible to tune channels, strides, expansion ratio, and spatial/temporal kernel sizes. Obviously, it is almost impossible to start experiments with optimal values. The problem is mentioned in the EfficientNet [2] paper, which concluded that it is essential to carefully balance model width, depth, and resolution.
+I found that the number of core blocks and their parameters dramatically affect the outcome.
+It's possible to tune channels, strides, expansion ratio, and spatial/temporal kernel sizes.
+Obviously, it is almost impossible to start experiments with optimal values.
+The problem is mentioned in the EfficientNet [3] paper, which concluded that it is essential to carefully balance model width, depth, and resolution.
 
-After a large number of experiments, I selected the following parameters:
-* Four blocks with 64 output channels, three with 128, and two with 256.
-* Three blocks have strides two. They are the first in each subgroup from the point above.
+After conducting a lot of experiments, I chose the following parameters:
+* Four blocks with 64 output channels, three with 128, and two with 256
+* Three blocks have stride two. They are the first in each subgroup from the point above
 * Expansion ratio of the inverted residual block is six
 * Kernel of spatial depth-wise convolution is (1, 3, 3)
 * Kernel of temporal depth-wise convolution is (5, 1, 1)
-
-Interestingly, the number of blocks decreases as the number of channels increases and the resolution decreases. I'm usually used to the inverse relation.
 
 ### Cortex
 * Conv1d with kernel size 1 is a parallel linear layers
@@ -84,8 +84,8 @@ Interestingly, the number of blocks decreases as the number of channels increase
 * Mean blend folds
 
 [1] Dynamic Sensorium competition https://arxiv.org/abs/2305.19654
-[2] EfficientNet https://arxiv.org/abs/1905.11946
-[3] MobileNetV2 https://arxiv.org/abs/1801.04381
+[2] MobileNetV2 https://arxiv.org/abs/1801.04381
+[3] EfficientNet https://arxiv.org/abs/1905.11946
 [4] Attention Is All You Need https://arxiv.org/abs/1706.03762
 [5] R(2+1)D https://arxiv.org/abs/1711.11248v3
 [6] ResNet https://arxiv.org/abs/1512.03385
