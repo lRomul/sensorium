@@ -6,8 +6,9 @@ This repository contains the code to reproduce the winning solution to the Senso
 The competition aims to find the best model that can predict the activity of neurons in the primary visual cortex of mice in response to videos.
 The competition introduced a temporal component using dynamic stimuli (videos) instead of static stimuli (images) used in Sensorium 2022, making the task more challenging.
 
-You can read about the competition in the [paper](https://arxiv.org/abs/2305.19654) [1].
-One important note to the paper is that additional data for five mice appeared during competition, doubling the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
+The primary metric of the competition was a single trial correlation.
+You can read about the metric, the data, and the task in the [competition paper](https://arxiv.org/abs/2305.19654) [1].
+It is important to note that additional data for five mice was introduced during the competition, which doubled the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
 
 ## Solution
 
@@ -50,7 +51,7 @@ Several methods were added to the core:
 * **Squeeze-and-Excitation** [7] - dynamic channel-wise feature recalibration.
 * **DropPath** [8, 9] - regularization that randomly drops the block's main path for each sample in batch.
 
-#### Core Scaling
+#### Hyperparameters
 
 I found that the number of core blocks and their parameters dramatically affect the outcome.
 It's possible to tune channels, strides, expansion ratio, and spatial/temporal kernel sizes.
@@ -74,7 +75,7 @@ The primary purpose of the cortex is to smoothly increase the number of channels
 
 The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [11]. Shortcut connections with stochastic depth similar to the core are also applied.
 
-#### Cortex Scaling
+#### Hyperparameters
 
 Hyperparameters of the cortex were also important:
 * Convolution with two groups and kernel size one. Bigger kernel size over temporal dimension has not led to better results.
@@ -86,25 +87,27 @@ Channel shuffle operation allows the sharing of information between groups of di
 
 ### Readouts
 
-Each readout is a single 1D convolutional similar to convolutions from the cortex, followed by Softplus activation.
+The readout is a single grouped 1D convolution, followed by Softplus activation.
 Each of the ten mice has its readout with the number of output channels equal to the number of neurons (7863, 7908, 8202, 7939, 8122, 7440, 7928, 8285, 7671, 7495, respectively).
 
 #### Softplus
 
-Keeping the response positive by using Softplus was crucial in my pipeline.
-It works much better than `ELU + 1` [10], especially if you tune the Softplus beta parameter.
+Keeping the response positive by using Softplus was essential in my pipeline.
+It works much better than `ELU + 1` [10], especially when I tune the Softplus beta parameter.
 In my case, the optimal beta value was about 0.07.
-The optimal value can depend on target normalization.
+The value can depend on target normalization.
 I didn't use any normalization for target and input tensors during the training.
+
+You can see a comparison of `ELU + 1` and Softplus in the plot below:
 
 ![softplus](data/readme_images/softplus.png)
 
 #### Learnable Softplus
 
-I also conducted an experiment where I made the beta parameter trainable.
+I also conducted an experiment where the beta parameter was trainable.
 Interestingly, the trained value converged approximately to the optimal, which I found by grid search.
 I omitted the learnable Softplus from the solution because it resulted in a slightly worse score.
-But this may be an excellent way to quickly and automatically find the optimal beta.
+But this may be an excellent way to quickly and automatically find a good beta.
 
 Here's a numerical stable implementation of learnable Softplus in PyTorch:
 
