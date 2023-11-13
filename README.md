@@ -41,15 +41,18 @@ The rest of the core consists of inverted residual blocks [2, 3] with a `narrow 
 
 #### Techniques
 
-Several methods were added to the core:
+Several methods were added to the inverted residual block:
 * **Absolute Position Encoding** [4] - summing the encoding to the input of each block allows convolutions to accumulate position information. It's quite important because of the subsequent spatial pooling after the core.
 * **Factorized (2+1)D convolution** [5] - 3D depth-wise convolution was replaced with a spatial 2D depth-wise convolution followed by a temporal 1D depth-wise convolution. There are spatial convolutions with stride two in some blocks to compress output size.
-* **Shortcut Connections** - completely parameter-free residual shortcuts. 
+* **Shortcut Connections** - completely parameter-free residual shortcuts with three operations: 
     * Identity mapping if input and output dimensions are equal. It's the same as the connection proposed in ResNet [6].
     * Nearest interpolation in case of different spatial sizes. 
     * Cycling repeating of channels if they don't match.
 * **Squeeze-and-Excitation** [7] - dynamic channel-wise feature recalibration.
-* **DropPath** [8, 9] - regularization that randomly drops the block's main path for each sample in batch.
+* **DropPath (Stochastic Depth)** [8, 9] - regularization that randomly drops the block's main path for each sample in batch.
+
+Batch normalization is applied after each layer, including the shortcut. 
+SiLU activation is used after expansion and depth-wise convolutions.
 
 #### Hyperparameters
 
@@ -67,13 +70,15 @@ After conducting a lot of experiments, I chose the following parameters:
 
 ### Cortex
 
-Compared with related works [10], I added a new part of the architecture - the cortex.
+Compared with related works [10], the model architecture includes a new part called the cortex.
 It is also common for all mice as the core.
-The cortex receives features that have only channels and temporal dimensions.
-Spatial information was accumulated thanks to position encoding previously applied in the core and compressed by average pooling after the core.
+The cortex receives features with only channels and temporal dimensions.
+Spatial information was accumulated thanks to position encoding applied previously in the core and compressed by average pooling after the core.
 The primary purpose of the cortex is to smoothly increase the number of channels, which the readouts will further use.
 
-The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [11]. Shortcut connections with stochastic depth similar to the core are also applied.
+The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [11].
+Similar to the core, shortcut connections with stochastic depth are also applied.
+Batch normalization and SiLU were applied the same way as in the core.
 
 #### Hyperparameters
 
@@ -87,7 +92,7 @@ Channel shuffle operation allows the sharing of information between groups of di
 
 ### Readouts
 
-The readout is a single grouped 1D convolution, followed by Softplus activation.
+The readout is a single 1D convolution with two groups and kernel size one, followed by Softplus activation.
 Each of the ten mice has its readout with the number of output channels equal to the number of neurons (7863, 7908, 8202, 7939, 8122, 7440, 7928, 8285, 7671, 7495, respectively).
 
 #### Softplus
