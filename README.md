@@ -154,28 +154,41 @@ The training was performed in two stages. The first stage is basic training with
 
 Each dataset sample is a grayscale video, behavior activity (pupil center, pupil dilation, and running speed), and the neuron responses of one mouse.
 All data is presented at 30 FPS. During training, the model consumes 16, skipping every second frame (equivalent to 16 neighboring frames at 15 FPS).
-The video frames were zero-padded to 64x64 pixels. The behavior activities were added as separate channels. 
+The video frames were zero-padded to 64x64 pixels. The behavior activities were added as separate channels.
 
 The ensemble of models from all folds gets 0.2905 single-trial correlation on the main track and 0.2207 on the bonus track in the final phase of the competition.
 This result would be enough to take first place in both tracks.
 
 ### Knowledge Distillation ([config](configs/distillation_001.py))
 
-For an individual sample in the batch, the loss was calculated only for the responses of only one mouse. Because the input tensor is associated with a single mouse trial, and there are no neural activity data for other mice. However, the model can predict responses for all mice from the input tensor. In the second stage of training, I used a method similar to knowledge distillation [13]. I created a pipeline where models from the first stage predict unlabeled responses during training. As a result, the second-stage models trained all their readouts via each batch sample. The loss value on distilled predictions was weighed to be 0.36% of the overall loss.  
+For an individual sample in the batch, the loss was calculated only for the responses of only one mouse.
+Because the input tensor is associated with a single mouse trial, and there are no neural activity data for other mice.
+However, the model can predict responses for all mice from the input tensor. In the second stage of training, I used a method similar to knowledge distillation [13].
+I created a pipeline where models from the first stage predict unlabeled responses during training.
+As a result, the second-stage models trained all their readouts via each batch sample.
+The loss value on distilled predictions was weighed to be 0.36% of the overall loss.
 
 The hyperparameters were identical, except for the expansion ratio in inverted residual blocks: seven in the first stage and six in the second.
 
-In the second stage, the ensemble of models achieves nearly the same single-trial correlation as the ensemble from the first stage. However, what's fascinating is that each fold model performs better by an average score of 0.007 than the corresponding model from the first stage. The distilled model works like an ensemble of undistilled models. According to the work [14], the individual model is forced to learn the ensemble's performance during knowledge distillation, and an ensemble of distilled models offers no more performance boost. I have observed the same behavior in my solution.
+In the second stage, the ensemble of models achieves nearly the same single-trial correlation as the ensemble from the first stage.
+However, what's fascinating is that each fold model performs better by an average score of 0.007 than the corresponding model from the first stage.
+Thus, the distilled model works like an ensemble of undistilled models.
+According to the work [14], the individual model is forced to learn the ensemble's performance during knowledge distillation, and an ensemble of distilled models offers no more performance boost.
+I can observe the same behavior in my solution.
+
+Distillation can be a great practice if you need one good model.
+But in ensembles, this leads to minor changes in performance.
 
 ## Prediction
 
-I used a model ensembling of two training stages to obtain a 0.2913 single-trial correlation on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively).
-The same model weights and prediction process were used for both competition tracks.
+The ensemble of both training stages obtained a 0.2913 single-trial correlation on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively). Averaging of training stages gives a slight performance boost compared to basic training models.
 
-The blending of responses was done in three steps:
-* Predict each frame, mean blending overlaps
-* Mean blend folds
-* Mean blend stages
+The ensemble was produced using the arithmetic mean of predictions:
+* Overlaps from each possible sequence of frames
+* Models from cross-validations  
+* Basic and distillation training stages
+
+The identical weights of models were used for the main track and bonus (out-of-distribution) competition tracks.
 
 ## References
 
@@ -190,9 +203,9 @@ The blending of responses was done in three steps:
 [9] Stochastic Depth https://arxiv.org/abs/1603.09382  
 [10] Generalization in data-driven models of primary visual cortex https://openreview.net/forum?id=Tp7kI90Htd  
 [11] ShuffleNet https://arxiv.org/abs/1707.01083v2  
-[12] CutMix https://arxiv.org/abs/1905.04899
-[13] Knowledge Distillation https://arxiv.org/abs/1503.02531
-[14] Towards Understanding Ensemble, Knowledge Distillation and Self-Distillation in Deep Learning https://arxiv.org/abs/2012.09816
+[12] CutMix https://arxiv.org/abs/1905.04899  
+[13] Knowledge Distillation https://arxiv.org/abs/1503.02531  
+[14] Towards Understanding Ensemble, Knowledge Distillation and Self-Distillation in Deep Learning https://arxiv.org/abs/2012.09816  
 
 ## Quick setup and start
 
