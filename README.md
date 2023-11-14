@@ -132,15 +132,35 @@ class LearnableSoftplus(nn.Module):
 ```
 
 ## Training
-* CutMix
+
+### Validation strategy
+
+At the end of the competition, I employed 7-fold cross-validation to check hypotheses and tune hyperparameters more precisely.
+I used all available labeled data to make folds.
+Random splits gave an overly optimistic metric estimation because some videos were duplicated (e.g., in the original validation split or between old and new datasets).
+To solve this issue, I created group folds with non-overlapping videos.
+Similar videos were found using [perceptual hashes](src/phash.py) of several frames fetched deterministically.
+
+### Basic training ([config](configs/true_batch_001.py))
+
 * MicePoissonLoss, all mice in batch
+* CutMix
+
+### Knowledge Distillation ([config](configs/distillation_001.py))
+
 * Fill unlabeled samples via distillation
-* 7k fold Cross-validation  
-* Split folds by videos perceptual hashes 
 
 ## Prediction
+
+I used a model ensembling of two training stages to obtain a 0.291 single-trial correlation on the main track and 0.221 on the bonus track in the final phase (0.301 and 0.217 in the live phase, respectively).
+The same model weights and prediction process were used for both competition tracks.
+
+The blending of responses was done in three steps:
 * Predict each frame, mean blending overlaps
 * Mean blend folds
+* Mean blend stages
+
+## References
 
 [1] Dynamic Sensorium competition https://arxiv.org/abs/2305.19654  
 [2] MobileNetV2 https://arxiv.org/abs/1801.04381  
