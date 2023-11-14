@@ -143,16 +143,33 @@ Similar videos were found using [perceptual hashes](src/phash.py) of several fra
 
 ### Basic training ([config](configs/true_batch_001.py))
 
-* MicePoissonLoss, all mice in batch
-* CutMix
+The training was performed in two stages. The first stage is basic training with the following pipeline parameters:
+* Learning rate warmup for the first three epochs from 0 to 2.4e-03, cosine annealing last 18 epochs to 2.4e-05
+* Batch size 32, one training epoch comprises 72000 samples
+* Optimizer AdamW with weight decay 0.05
+* Poisson loss
+* Model EMA with decay 0.999
+* CutMix [12] with alpha 1.0 and usage probability 0.5
+* The sampling of different mice in the batch is random by uniform distribution
+
+Each dataset sample is a grayscale video, behavior activity (pupil center, pupil dilation, and running speed), and the neuron responses of one mouse.
+All data is presented at 30 FPS. During training, the model consumes 16, skipping every second frame (equivalent to 16 neighboring frames at 15 FPS).
+The video frames were zero-padded to 64x64 pixels. The behavior activities were added as separate channels. 
+
+The ensemble of models from all folds gets 0.2905 single-trial correlation on the main track and 0.2207 on the bonus track in the final phase of the competition.
+This result would be enough to take first place in both tracks.
 
 ### Knowledge Distillation ([config](configs/distillation_001.py))
 
-* Fill unlabeled samples via distillation
+For an individual sample in the batch, the loss was calculated only for the responses of only one mouse. Because the input tensor is associated with a single mouse trial, and there are no neural activity data for other mice. However, the model can predict responses for all mice from the input tensor. In the second stage of training, I used a method similar to knowledge distillation [13]. I created a pipeline where models from the first stage predict unlabeled responses during training. As a result, the second-stage models trained all their readouts via each batch sample. The loss value on distilled predictions was weighed to be 0.36% of the overall loss.  
+
+The hyperparameters were identical, except for the expansion ratio in inverted residual blocks: seven in the first stage and six in the second.
+
+In the second stage, the ensemble of models achieves nearly the same single-trial correlation as the ensemble from the first stage. However, what's fascinating is that each fold model performs better by an average score of 0.007 than the corresponding model from the first stage. The distilled model works like an ensemble of undistilled models. According to the work [14], the individual model is forced to learn the ensemble's performance during knowledge distillation, and an ensemble of distilled models offers no more performance boost. I have observed the same behavior in my solution.
 
 ## Prediction
 
-I used a model ensembling of two training stages to obtain a 0.291 single-trial correlation on the main track and 0.221 on the bonus track in the final phase (0.301 and 0.217 in the live phase, respectively).
+I used a model ensembling of two training stages to obtain a 0.2913 single-trial correlation on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively).
 The same model weights and prediction process were used for both competition tracks.
 
 The blending of responses was done in three steps:
@@ -173,6 +190,9 @@ The blending of responses was done in three steps:
 [9] Stochastic Depth https://arxiv.org/abs/1603.09382  
 [10] Generalization in data-driven models of primary visual cortex https://openreview.net/forum?id=Tp7kI90Htd  
 [11] ShuffleNet https://arxiv.org/abs/1707.01083v2  
+[12] CutMix https://arxiv.org/abs/1905.04899
+[13] Knowledge Distillation https://arxiv.org/abs/1503.02531
+[14] Towards Understanding Ensemble, Knowledge Distillation and Self-Distillation in Deep Learning https://arxiv.org/abs/2012.09816
 
 ## Quick setup and start
 
