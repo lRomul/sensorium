@@ -98,10 +98,8 @@ Each of the ten mice has its readout with the number of output channels equal to
 #### Softplus
 
 Keeping the response positive by using Softplus was essential in my pipeline.
-It works much better than `ELU + 1` [10], especially when I tune the Softplus beta parameter.
-In my case, the optimal beta value was about 0.07.
-The value can depend on target normalization.
-I didn't use any normalization for target and input tensors during the training.
+It works much better than `ELU + 1` [10], especially with tuning the Softplus beta parameter.
+In my case, the optimal beta value was about 0.07, which resulted in a 0.018 increase in the correlation metric.
 
 You can see a comparison of `ELU + 1` and Softplus in the plot below:
 
@@ -152,16 +150,16 @@ The training was performed in two stages. The first stage is basic training with
 * CutMix [12] with alpha 1.0 and usage probability 0.5
 * The sampling of different mice in the batch is random by uniform distribution
 
-Each dataset sample is a grayscale video, behavior activity (pupil center, pupil dilation, and running speed), and the neuron responses of one mouse.
+Each dataset sample consists of a grayscale video, behavior activity measurements (pupil center, pupil dilation, and running speed), and the neuron responses of a single mouse.
 All data is presented at 30 FPS. During training, the model consumes 16, skipping every second frame (equivalent to 16 neighboring frames at 15 FPS).
-The video frames were zero-padded to 64x64 pixels. The behavior activities were added as separate channels.
+The video frames were zero-padded to 64x64 pixels. The behavior activities were added as separate channels. No normalization is applied to the target and input tensors during training.
 
 The ensemble of models from all folds gets 0.2905 single-trial correlation on the main track and 0.2207 on the bonus track in the final phase of the competition.
 This result would be enough to take first place in both tracks.
 
 ### Knowledge Distillation ([config](configs/distillation_001.py))
 
-For an individual sample in the batch, the loss was calculated only for the responses of only one mouse.
+For an individual sample in the batch, the loss was calculated for the responses of only one mouse.
 Because the input tensor is associated with a single mouse trial, and there are no neural activity data for other mice.
 However, the model can predict responses for all mice from the input tensor. In the second stage of training, I used a method similar to knowledge distillation [13].
 I created a pipeline where models from the first stage predict unlabeled responses during training.
@@ -171,7 +169,7 @@ The loss value on distilled predictions was weighed to be 0.36% of the overall l
 The hyperparameters were identical, except for the expansion ratio in inverted residual blocks: seven in the first stage and six in the second.
 
 In the second stage, the ensemble of models achieves nearly the same single-trial correlation as the ensemble from the first stage.
-However, what's fascinating is that each fold model performs better by an average score of 0.007 than the corresponding model from the first stage.
+However, what is fascinating is that each fold model performs better by an average score of 0.007 than the corresponding model from the first stage.
 Thus, the distilled model works like an ensemble of undistilled models.
 According to the work [14], the individual model is forced to learn the ensemble's performance during knowledge distillation, and an ensemble of distilled models offers no more performance boost.
 I can observe the same behavior in my solution.
@@ -181,14 +179,14 @@ But in ensembles, this leads to minor changes in performance.
 
 ## Prediction
 
-The ensemble of both training stages obtained a 0.2913 single-trial correlation on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively). Averaging of training stages gives a slight performance boost compared to basic training models.
+The ensembling method utilized the arithmetic mean of predictions from every possible sequence of frames and models from cross-validation.
+Identical weights were used for both the main and bonus competition tracks.
 
-The ensemble was produced using the arithmetic mean of predictions:
-* Overlaps from each possible sequence of frames
-* Models from cross-validations  
-* Basic and distillation training stages
+The combination of ensembles from both training stages achieved a single-trial correlation of 0.2913 on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively).
 
-The identical weights of models were used for the main track and bonus (out-of-distribution) competition tracks.
+## Competition progress
+
+
 
 ## References
 
