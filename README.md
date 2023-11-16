@@ -7,7 +7,7 @@ The competition aims to find the best model that can predict the activity of neu
 The competition introduced a temporal component using dynamic stimuli (videos) instead of static stimuli (images) used in Sensorium 2022, making the task more challenging.
 
 The primary metric of the competition was a single trial correlation.
-You can read about the metric, the data, and the task in the [competition paper](https://arxiv.org/abs/2305.19654) [1].
+You can read about the metric, the data, and the task in the competition paper [^1].
 It is important to note that additional data for five mice was introduced during the competition, which doubled the dataset's size ([old](https://gin.g-node.org/pollytur/Sensorium2023Data) and [new](https://gin.g-node.org/pollytur/sensorium_2023_dataset) data).
 
 ## Solution
@@ -37,19 +37,19 @@ In the following sections, we will delve deeper into each part of the architectu
 ### Core
 
 The first layer of the module is the stem. It's a point-wise convolution for increasing the number of channels, followed by batch normalization.
-The rest of the core consists of inverted residual blocks [2, 3] with a `narrow -> wide -> narrow` channel structure. 
+The rest of the core consists of inverted residual blocks [^2][^3] with a `narrow -> wide -> narrow` channel structure. 
 
 #### Techniques
 
 Several methods were added to the inverted residual block:
-* **Absolute Position Encoding** [4] - summing the encoding to the input of each block allows convolutions to accumulate position information. It's quite important because of the subsequent spatial pooling after the core.
-* **Factorized (2+1)D convolution** [5] - 3D depth-wise convolution was replaced with a spatial 2D depth-wise convolution followed by a temporal 1D depth-wise convolution. There are spatial convolutions with stride two in some blocks to compress output size.
+* **Absolute Position Encoding** [^4] - summing the encoding to the input of each block allows convolutions to accumulate position information. It's quite important because of the subsequent spatial pooling after the core.
+* **Factorized (2+1)D convolution** [^5] - 3D depth-wise convolution was replaced with a spatial 2D depth-wise convolution followed by a temporal 1D depth-wise convolution. There are spatial convolutions with stride two in some blocks to compress output size.
 * **Shortcut Connections** - completely parameter-free residual shortcuts with three operations: 
-    * Identity mapping if input and output dimensions are equal. It's the same as the connection proposed in ResNet [6].
+    * Identity mapping if input and output dimensions are equal. It's the same as the connection proposed in ResNet [^6].
     * Nearest interpolation in case of different spatial sizes. 
     * Cycling repeating of channels if they don't match.
-* **Squeeze-and-Excitation** [7] - dynamic channel-wise feature recalibration.
-* **DropPath (Stochastic Depth)** [8, 9] - regularization that randomly drops the block's main path for each sample in batch.
+* **Squeeze-and-Excitation** [^7] - dynamic channel-wise feature recalibration.
+* **DropPath (Stochastic Depth)** [^8][^9] - regularization that randomly drops the block's main path for each sample in batch.
 
 Batch normalization is applied after each layer, including the shortcut. 
 SiLU activation is used after expansion and depth-wise convolutions.
@@ -59,7 +59,7 @@ SiLU activation is used after expansion and depth-wise convolutions.
 I found that the number of core blocks and their parameters dramatically affect the outcome.
 It's possible to tune channels, strides, expansion ratio, and spatial/temporal kernel sizes.
 Obviously, it is almost impossible to start experiments with optimal values.
-The problem is mentioned in the EfficientNet [3] paper, which concluded that it is essential to carefully balance model width, depth, and resolution.
+The problem is mentioned in the EfficientNet [^3] paper, which concluded that it is essential to carefully balance model width, depth, and resolution.
 
 After conducting a lot of experiments, I chose the following parameters:
 * Four blocks with 64 output channels, three with 128, and two with 256.
@@ -70,13 +70,13 @@ After conducting a lot of experiments, I chose the following parameters:
 
 ### Cortex
 
-Compared with related works [10], the model architecture includes a new part called the cortex.
+Compared with related works [^10][^11], the model architecture includes a new part called the cortex.
 It is also common for all mice as the core.
 The cortex receives features with only channels and temporal dimensions.
 Spatial information was accumulated thanks to position encoding applied previously in the core and compressed by average pooling after the core.
 The primary purpose of the cortex is to smoothly increase the number of channels, which the readouts will further use.
 
-The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [11].
+The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [^12].
 Similar to the core, shortcut connections with stochastic depth are also applied.
 Batch normalization and SiLU were applied the same way as in the core.
 
@@ -97,8 +97,8 @@ Each of the ten mice has its readout with the number of output channels equal to
 
 #### Softplus
 
-Keeping the response positive by using Softplus was essential in my pipeline.
-It works much better than `ELU + 1` [10], especially with tuning the Softplus beta parameter.
+Keeping the response positive by using Softplus [^10] was essential in my pipeline.
+It works much better than `ELU + 1` [^11], especially with tuning the Softplus beta parameter.
 In my case, the optimal beta value was about 0.07, which resulted in a 0.018 increase in the correlation metric.
 
 You can see a comparison of `ELU + 1` and Softplus in the plot below:
@@ -144,10 +144,10 @@ Similar videos were found using [perceptual hashes](src/phash.py) of several fra
 The training was performed in two stages. The first stage is basic training with the following pipeline parameters:
 * Learning rate warmup for the first three epochs from 0 to 2.4e-03, cosine annealing last 18 epochs to 2.4e-05
 * Batch size 32, one training epoch comprises 72000 samples
-* Optimizer AdamW with weight decay 0.05
+* Optimizer AdamW [^13] with weight decay 0.05
 * Poisson loss
 * Model EMA with decay 0.999
-* CutMix [12] with alpha 1.0 and usage probability 0.5
+* CutMix [^14] with alpha 1.0 and usage probability 0.5
 * The sampling of different mice in the batch is random by uniform distribution
 
 Each dataset sample consists of a grayscale video, behavior activity measurements (pupil center, pupil dilation, and running speed), and the neuron responses of a single mouse.
@@ -161,7 +161,7 @@ This result would be enough to take first place in both tracks.
 
 For an individual sample in the batch, the loss was calculated for the responses of only one mouse.
 Because the input tensor is associated with a single mouse trial, and there are no neural activity data for other mice.
-However, the model can predict responses for all mice from the input tensor. In the second stage of training, I used a method similar to knowledge distillation [13].
+However, the model can predict responses for all mice from the input tensor. In the second stage of training, I used a method similar to knowledge distillation [^15].
 I created a pipeline where models from the first stage predict unlabeled responses during training.
 As a result, the second-stage models trained all their readouts via each batch sample.
 The loss value on distilled predictions was weighed to be 0.36% of the overall loss.
@@ -171,7 +171,7 @@ The hyperparameters were identical, except for the expansion ratio in inverted r
 In the second stage, the ensemble of models achieves nearly the same single-trial correlation as the ensemble from the first stage.
 However, what is fascinating is that each fold model performs better by an average score of 0.007 than the corresponding model from the first stage.
 Thus, the distilled model works like an ensemble of undistilled models.
-According to the work [14], the individual model is forced to learn the ensemble's performance during knowledge distillation, and an ensemble of distilled models offers no more performance boost.
+According to the work [^16], the individual model is forced to learn the ensemble's performance during knowledge distillation, and an ensemble of distilled models offers no more performance boost.
 I can observe the same behavior in my solution.
 
 Distillation can be a great practice if you need one good model.
@@ -202,22 +202,24 @@ Lastly, adjusting drop rate and batch size parameters helped to achieve a score 
 The ensemble of the basic and distillation training stages achieved a single-trial correlation of 0.2913 on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively).
 This result was enough for first place in both tracks of the competition.
 
-## References
+<!-- ## References -->
 
-[1] Dynamic Sensorium competition https://arxiv.org/abs/2305.19654  
-[2] MobileNetV2 https://arxiv.org/abs/1801.04381  
-[3] EfficientNet https://arxiv.org/abs/1905.11946  
-[4] Attention Is All You Need https://arxiv.org/abs/1706.03762  
-[5] R(2+1)D https://arxiv.org/abs/1711.11248v3  
-[6] ResNet https://arxiv.org/abs/1512.03385  
-[7] Squeeze-and-Excitation https://arxiv.org/abs/1709.01507  
-[8] DropPath https://arxiv.org/abs/1605.07648v4  
-[9] Stochastic Depth https://arxiv.org/abs/1603.09382  
-[10] Generalization in data-driven models of primary visual cortex https://openreview.net/forum?id=Tp7kI90Htd  
-[11] ShuffleNet https://arxiv.org/abs/1707.01083v2  
-[12] CutMix https://arxiv.org/abs/1905.04899  
-[13] Knowledge Distillation https://arxiv.org/abs/1503.02531  
-[14] Towards Understanding Ensemble, Knowledge Distillation and Self-Distillation in Deep Learning https://arxiv.org/abs/2012.09816  
+[^1]: Turishcheva, Polina, et al. "The Dynamic Sensorium competition for predicting large-scale mouse visual cortex activity from videos." https://arxiv.org/abs/2305.19654 2023.  
+[^2]: Sandler, Mark, et al. "Mobilenetv2: Inverted residuals and linear bottlenecks." https://arxiv.org/abs/1801.04381 2018.  
+[^3]: Tan, Mingxing, and Quoc Le. "Efficientnet: Rethinking model scaling for convolutional neural networks." https://arxiv.org/abs/1905.11946 2019.  
+[^4]: Vaswani, Ashish, et al. "Attention is all you need." https://arxiv.org/abs/1706.03762 (2017).  
+[^5]: Tran, Du, et al. "A closer look at spatiotemporal convolutions for action recognition." https://arxiv.org/abs/1711.11248 2018.  
+[^6]: He, Kaiming, et al. "Deep residual learning for image recognition." https://arxiv.org/abs/1512.03385 2016.  
+[^7]: Hu, Jie, Li Shen, and Gang Sun. "Squeeze-and-excitation networks." https://arxiv.org/abs/1709.01507 2018.  
+[^8]: Larsson, Gustav, Michael Maire, and Gregory Shakhnarovich. "Fractalnet: Ultra-deep neural networks without residuals." https://arxiv.org/abs/1605.07648 2016.  
+[^9]: Huang, Gao, et al. "Deep networks with stochastic depth." https://arxiv.org/abs/1603.09382 2016.  
+[^10]: Höfling, Larissa, et al. "A chromatic feature detector in the retina signals visual context changes." https://www.biorxiv.org/content/10.1101/2022.11.30.518492 2022.  
+[^11]: Lurz, Konstantin-Klemens, et al. "Generalization in data-driven models of primary visual cortex." https://www.biorxiv.org/content/10.1101/2020.10.05.326256 2020.  
+[^12]: Zhang, Xiangyu, et al. "Shufflenet: An extremely efficient convolutional neural network for mobile devices." https://arxiv.org/abs/1707.01083 2018.  
+[^13]: Loshchilov, Ilya, and Frank Hutter. "Decoupled weight decay regularization." https://arxiv.org/abs/1711.05101 2017.  
+[^14]: Yun, Sangdoo, et al. "Cutmix: Regularization strategy to train strong classifiers with localizable features." https://arxiv.org/abs/1905.04899 2019.  
+[^15]: Hinton, Geoffrey, Oriol Vinyals, and Jeff Dean. "Distilling the knowledge in a neural network." https://arxiv.org/abs/1503.02531 2015.  
+[^16]: Allen-Zhu, Zeyuan, and Yuanzhi Li. "Towards understanding ensemble, knowledge distillation and self-distillation in deep learning." https://arxiv.org/abs/2012.09816 2020.  
 
 ## Quick setup and start
 
