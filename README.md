@@ -2,8 +2,8 @@
 
 ![header](data/readme_images/header.png)
 
-This repository contains the code to reproduce the winning solution to the Sensorium 2023, part of the NeurIPS 2023 competition track.
-The competition aims to find the best model that can predict the activity of neurons in the primary visual cortex of mice in response to videos.
+This repository contains the winning solution for the Sensorium 2023, part of the NeurIPS 2023 competition track.
+The competition aimed to find the best model that can predict the activity of neurons in the primary visual cortex of mice in response to videos.
 The competition introduced a temporal component using dynamic stimuli (videos) instead of static stimuli (images) used in Sensorium 2022, making the task more challenging.
 
 The primary metric of the competition was a single trial correlation.
@@ -13,9 +13,9 @@ It is important to note that additional data for five mice was introduced during
 ## Solution
 
 Key points:
-* [DwiseNeuro](src/models/dwiseneuro.py) - novel model architecture for prediction neural activity in the mouse primary visual cortex
-* Solid cross-validation strategy with splitting folds by perceptual video hash
-* Training on all mice with an option to fill unlabeled samples via distillation
+* [DwiseNeuro](src/models/dwiseneuro.py) - novel model architecture for prediction neural activity in the mouse primary visual cortex.
+* Solid cross-validation strategy with splitting folds by perceptual video hash.
+* Training on all mice with an option to fill unlabeled samples via distillation.
 
 ## Model Architecture
 
@@ -204,22 +204,22 @@ This result was enough for first place in both tracks of the competition.
 
 <!-- ## References -->
 
-[^1]: Turishcheva, Polina, et al. "The Dynamic Sensorium competition for predicting large-scale mouse visual cortex activity from videos." https://arxiv.org/abs/2305.19654 2023.  
-[^2]: Sandler, Mark, et al. "Mobilenetv2: Inverted residuals and linear bottlenecks." https://arxiv.org/abs/1801.04381 2018.  
-[^3]: Tan, Mingxing, and Quoc Le. "Efficientnet: Rethinking model scaling for convolutional neural networks." https://arxiv.org/abs/1905.11946 2019.  
-[^4]: Vaswani, Ashish, et al. "Attention is all you need." https://arxiv.org/abs/1706.03762 (2017).  
-[^5]: Tran, Du, et al. "A closer look at spatiotemporal convolutions for action recognition." https://arxiv.org/abs/1711.11248 2018.  
-[^6]: He, Kaiming, et al. "Deep residual learning for image recognition." https://arxiv.org/abs/1512.03385 2016.  
-[^7]: Hu, Jie, Li Shen, and Gang Sun. "Squeeze-and-excitation networks." https://arxiv.org/abs/1709.01507 2018.  
-[^8]: Larsson, Gustav, Michael Maire, and Gregory Shakhnarovich. "Fractalnet: Ultra-deep neural networks without residuals." https://arxiv.org/abs/1605.07648 2016.  
-[^9]: Huang, Gao, et al. "Deep networks with stochastic depth." https://arxiv.org/abs/1603.09382 2016.  
-[^10]: Höfling, Larissa, et al. "A chromatic feature detector in the retina signals visual context changes." https://www.biorxiv.org/content/10.1101/2022.11.30.518492 2022.  
-[^11]: Lurz, Konstantin-Klemens, et al. "Generalization in data-driven models of primary visual cortex." https://www.biorxiv.org/content/10.1101/2020.10.05.326256 2020.  
-[^12]: Zhang, Xiangyu, et al. "Shufflenet: An extremely efficient convolutional neural network for mobile devices." https://arxiv.org/abs/1707.01083 2018.  
-[^13]: Loshchilov, Ilya, and Frank Hutter. "Decoupled weight decay regularization." https://arxiv.org/abs/1711.05101 2017.  
-[^14]: Yun, Sangdoo, et al. "Cutmix: Regularization strategy to train strong classifiers with localizable features." https://arxiv.org/abs/1905.04899 2019.  
-[^15]: Hinton, Geoffrey, Oriol Vinyals, and Jeff Dean. "Distilling the knowledge in a neural network." https://arxiv.org/abs/1503.02531 2015.  
-[^16]: Allen-Zhu, Zeyuan, and Yuanzhi Li. "Towards understanding ensemble, knowledge distillation and self-distillation in deep learning." https://arxiv.org/abs/2012.09816 2020.  
+[^1]: Turishcheva, Polina, et al. (2023). The Dynamic Sensorium competition for predicting large-scale mouse visual cortex activity from videos. https://arxiv.org/abs/2305.19654  
+[^2]: Sandler, Mark, et al. (2018). Mobilenetv2: Inverted residuals and linear bottlenecks. https://arxiv.org/abs/1801.04381  
+[^3]: Tan, Mingxing, and Quoc Le. (2019). Efficientnet: Rethinking model scaling for convolutional neural networks. https://arxiv.org/abs/1905.11946  
+[^4]: Vaswani, Ashish, et al. (2017). Attention is all you need. https://arxiv.org/abs/1706.03762  
+[^5]: Tran, Du, et al. (2018). A closer look at spatiotemporal convolutions for action recognition. https://arxiv.org/abs/1711.11248  
+[^6]: He, Kaiming, et al. (2016). Deep residual learning for image recognition. https://arxiv.org/abs/1512.03385  
+[^7]: Hu, Jie, Li Shen, and Gang Sun. (2018). Squeeze-and-excitation networks. https://arxiv.org/abs/1709.01507  
+[^8]: Larsson, Gustav, Michael Maire, and Gregory Shakhnarovich. (2016). Fractalnet: Ultra-deep neural networks without residuals. https://arxiv.org/abs/1605.07648  
+[^9]: Huang, Gao, et al. (2016). Deep networks with stochastic depth. https://arxiv.org/abs/1603.09382  
+[^10]: Höfling, Larissa, et al. (2022). A chromatic feature detector in the retina signals visual context changes. https://www.biorxiv.org/content/10.1101/2022.11.30.518492  
+[^11]: Lurz, Konstantin-Klemens, et al. (2020). Generalization in data-driven models of primary visual cortex. https://www.biorxiv.org/content/10.1101/2020.10.05.326256  
+[^12]: Zhang, Xiangyu, et al. (2018). Shufflenet: An extremely efficient convolutional neural network for mobile devices. https://arxiv.org/abs/1707.01083  
+[^13]: Loshchilov, Ilya, and Frank Hutter. (2017). Decoupled weight decay regularization. https://arxiv.org/abs/1711.05101  
+[^14]: Yun, Sangdoo, et al. (2019). Cutmix: Regularization strategy to train strong classifiers with localizable features. https://arxiv.org/abs/1905.04899  
+[^15]: Hinton, Geoffrey, Oriol Vinyals, and Jeff Dean. (2015). Distilling the knowledge in a neural network. https://arxiv.org/abs/1503.02531  
+[^16]: Allen-Zhu, Zeyuan, and Yuanzhi Li. (2020). Towards understanding ensemble, knowledge distillation and self-distillation in deep learning. https://arxiv.org/abs/2012.09816  
 
 ## Quick setup and start
 
