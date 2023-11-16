@@ -179,14 +179,28 @@ But in ensembles, this leads to minor changes in performance.
 
 ## Prediction
 
-The ensembling method utilized the arithmetic mean of predictions from every possible sequence of frames and models from cross-validation.
-Identical weights were used for both the main and bonus competition tracks.
+The ensembles were produced by taking the arithmetic mean of predictions from multiple steps:
+* Overlapping a sliding window over each possible sequence of frames 
+* Models from cross-validations of one training stage
+* Training stages (optional)
 
-The combination of ensembles from both training stages achieved a single-trial correlation of 0.2913 on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively).
+I used the same model weights for the main and bonus (out-of-distribution) competition tracks.
 
 ## Competition progress
 
+You can see the progress of solution development during the competition in [spreadsheets](https://docs.google.com/spreadsheets/d/1xJTB6lZvtjNSQbYQiB_hgKIrL9hUB0uL3xhUAK1Pmxw/edit#gid=0) (the document consists of multiple sheets).
+Unfortunately, the document contains less than half of the conducted experiments because sometimes I was too lazy to fill it :)
+However, if you need a complete chronology of valuable changes, you can see it in git history.
 
+To summarize, an early model with depth-wise 3D convolution blocks achieved a score of around 0.19 on the main track during the live phase of the competition. 
+Subsequently, implementing techniques from the core section, tuning hyperparameters, and training on all available data boosted the score to 0.25.
+Applying non-standard normalization, expected by evaluation servers, on postprocessing improved the score to 0.27.
+The cortex and CutMix increased the score to 0.276. 
+Then, the beta value of Softplus was tuned, resulting in a score of 0.294.
+Lastly, adjusting drop rate and batch size parameters helped to achieve a score of 0.3 on the main track during the live phase.
+
+The ensemble of the basic and distillation training stages achieved a single-trial correlation of 0.2913 on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively).
+This result was enough for first place in both tracks of the competition.
 
 ## References
 
