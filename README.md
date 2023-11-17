@@ -77,13 +77,12 @@ Spatial information was accumulated thanks to position encoding applied previous
 The primary purpose of the cortex is to smoothly increase the number of channels, which the readouts will further use.
 
 The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [^12].
-Similar to the core, shortcut connections with stochastic depth are also applied.
-Batch normalization and SiLU were applied the same way as in the core.
+Batch normalization, SiLU activation, and shortcut connections with stochastic depth were applied similarly to the core.
 
 #### Hyperparameters
 
 Hyperparameters of the cortex were also important:
-* Convolution with two groups and kernel size one. Bigger kernel size over temporal dimension has not led to better results.
+* Convolution with two groups and kernel size one (bigger kernel size over temporal dimension has not led to better results).
 * Three layers with 1024, 2048, and 4096 channels.
 
 As you can see, the number of channels is quite large.
@@ -135,7 +134,7 @@ class LearnableSoftplus(nn.Module):
 
 At the end of the competition, I employed 7-fold cross-validation to check hypotheses and tune hyperparameters more precisely.
 I used all available labeled data to make folds.
-Random splits gave an overly optimistic metric estimation because some videos were duplicated (e.g., in the original validation split or between old and new datasets).
+Random splitting gave an overly optimistic metric estimation because some videos were duplicated (e.g., in the original validation split or between old and new datasets).
 To solve this issue, I created group folds with non-overlapping videos.
 Similar videos were found using [perceptual hashes](src/phash.py) of several frames fetched deterministically.
 
@@ -155,7 +154,7 @@ All data is presented at 30 FPS. During training, the model consumes 16, skippin
 The video frames were zero-padded to 64x64 pixels. The behavior activities were added as separate channels. No normalization is applied to the target and input tensors during training.
 
 The ensemble of models from all folds gets 0.2905 single-trial correlation on the main track and 0.2207 on the bonus track in the final phase of the competition.
-This result would be enough to take first place in both tracks.
+This result would be enough to take first place in the main and bonus (out-of-distribution) competition tracks.
 
 ### Knowledge Distillation ([config](configs/distillation_001.py))
 
@@ -180,11 +179,12 @@ But in ensembles, this leads to minor changes in performance.
 ## Prediction
 
 The ensembles were produced by taking the arithmetic mean of predictions from multiple steps:
-* Overlapping a sliding window over each possible sequence of frames 
-* Models from cross-validations of one training stage
-* Training stages (optional)
+* Overlapping a sliding window over each possible sequence of frames.
+* Models from cross-validations of one training stage.
+* Training stages (optional).
 
-I used the same model weights for the main and bonus (out-of-distribution) competition tracks.
+I used the same model weights for both competition tracks.
+The competition only evaluated the responses of five mice from the new dataset, so I only predicted those.
 
 ## Competition progress
 
@@ -200,7 +200,10 @@ Then, the beta value of Softplus was tuned, resulting in a score of 0.294.
 Lastly, adjusting drop rate and batch size parameters helped to achieve a score of 0.3 on the main track during the live phase.
 
 The ensemble of the basic and distillation training stages achieved a single-trial correlation of 0.2913 on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively).
-This result was enough for first place in both tracks of the competition.
+This result is quite a bit better than the basic training result alone, but I should provide it because it was the best submission in the competition.
+In addition, it was interesting to research the relation between ensembling and distillation, which I wrote above.
+
+Thanks to the Sensorium organizers and participants for the excellent competition. Thanks to my family and friends who supported me during the competition!
 
 <!-- ## References -->
 
