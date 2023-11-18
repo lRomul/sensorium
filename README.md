@@ -1,6 +1,10 @@
+<div align="center">
+
 # Solution for Sensorium 2023 Competition
 
-![header](data/readme_images/header.png)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+</div>
 
 This repository contains the winning solution for the Sensorium 2023, part of the NeurIPS 2023 competition track.
 The competition aimed to find the best model that can predict the activity of neurons in the primary visual cortex of mice in response to videos.

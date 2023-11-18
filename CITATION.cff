@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+title: Solution for Sensorium 2023 Competition
+message: 'If you use this work, please cite it using these metadata.'
+type: software
+authors:
+  - given-names: Ruslan
+    family-names: Baikulov
+    email: ruslan1123@gmail.com
+    orcid: 'https://orcid.org/0009-0003-4400-0619'
+repository-code: 'https://github.com/lRomul/sensorium'
+abstract: >-
+  This repository contains the winning solution for the Sensorium 2023 Competition.
+  The competition aimed to predict the activity of neurons in the primary visual
+  cortex of mice in response to videos. The proposed solution includes a novel
+  model architecture called DwiseNeuro and a training pipeline with a solid
+  cross-validation strategy and knowledge distillation.
+license: MIT
+version: v23.11.18
+date-released: '2023-11-18'
