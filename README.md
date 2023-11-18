@@ -3,6 +3,7 @@
 # Solution for Sensorium 2023 Competition
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10155151.svg)](https://doi.org/10.5281/zenodo.10155152)
 
 </div>
 
