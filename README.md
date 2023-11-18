@@ -36,12 +36,12 @@ In the following sections, we will delve deeper into each part of the architectu
 
 ### Core
 
-The first layer of the module is the stem. It's a point-wise convolution for increasing the number of channels, followed by batch normalization.
+The first layer of the module is the stem. It's a point-wise 3D convolution for increasing the number of channels, followed by batch normalization.
 The rest of the core consists of inverted residual blocks [^2][^3] with a `narrow -> wide -> narrow` channel structure. 
 
 #### Techniques
 
-Several methods were added to the inverted residual block:
+Several methods were added to the inverted residual block rewritten in 3D layers:
 * **Absolute Position Encoding** [^4] - summing the encoding to the input of each block allows convolutions to accumulate position information. It's quite important because of the subsequent spatial pooling after the core.
 * **Factorized (2+1)D convolution** [^5] - 3D depth-wise convolution was replaced with a spatial 2D depth-wise convolution followed by a temporal 1D depth-wise convolution. There are spatial convolutions with stride two in some blocks to compress output size.
 * **Shortcut Connections** - completely parameter-free residual shortcuts with three operations: 
