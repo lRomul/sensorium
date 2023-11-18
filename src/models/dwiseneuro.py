@@ -268,7 +268,7 @@ class Readout(nn.Module):
                  in_features: int,
                  out_features: int,
                  groups: int = 1,
-                 softplus_beta: int = 1,
+                 softplus_beta: float = 1.0,
                  drop_rate: float = 0.):
         super().__init__()
         self.out_features = out_features
@@ -278,7 +278,7 @@ class Readout(nn.Module):
                       math.ceil(out_features / groups) * groups, (1,),
                       groups=groups, bias=True),
         )
-        self.gate = nn.Softplus(beta=softplus_beta)
+        self.gate = nn.Softplus(beta=softplus_beta)  # type: ignore
 
     def forward(self, x):
         x = self.layer(x)
@@ -352,7 +352,7 @@ class DwiseNeuro(nn.Module):
                  se_reduce_ratio: int = 32,
                  cortex_features: tuple[int, ...] = (1024, 2048, 4096),
                  groups: int = 2,
-                 softplus_beta: int = 0.07,
+                 softplus_beta: float = 0.07,
                  drop_rate: float = 0.4,
                  drop_path_rate: float = 0.1):
         super().__init__()

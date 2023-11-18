@@ -56,7 +56,7 @@ def train_mouse(config: dict, save_dir: Path, train_splits: list[str], val_split
         checkpoint_class = Checkpoint
 
     if "distill" in config:
-        distill_params =  config["distill"]
+        distill_params = config["distill"]
         distill_experiment_dir = constants.experiments_dir / distill_params["experiment"] / val_splits[0]
         distill_model_path = get_best_model_path(distill_experiment_dir)
         distill_model = load_model(distill_model_path, device=argus_params["device"])
