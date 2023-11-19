@@ -77,8 +77,8 @@ After conducting a lot of experiments, I chose the following parameters:
 
 Compared with related works [^10][^11], the model architecture includes a new part called the cortex.
 It is also common for all mice as the core.
-The cortex receives features with only channels and temporal dimensions.
-Spatial information was accumulated thanks to position encoding applied previously in the core and compressed by average pooling after the core.
+The cortex receives features with channels and temporal dimensions only.
+Spatial information was accumulated through position encoding applied earlier in the core and compressed by average pooling after the core.
 The primary purpose of the cortex is to smoothly increase the number of channels, which the readouts will further use.
 
 The building element of the module is a grouped 1D convolution followed by the channel shuffle operation [^12].
@@ -155,8 +155,10 @@ The training was performed in two stages. The first stage is basic training with
 * The sampling of different mice in the batch is random by uniform distribution
 
 Each dataset sample consists of a grayscale video, behavior activity measurements (pupil center, pupil dilation, and running speed), and the neuron responses of a single mouse.
-All data is presented at 30 FPS. During training, the model consumes 16, skipping every second frame (equivalent to 16 neighboring frames at 15 FPS).
-The video frames were zero-padded to 64x64 pixels. The behavior activities were added as separate channels. No normalization is applied to the target and input tensors during training.
+All data is presented at 30 FPS. During training, the model consumes 16 frames, skipping every second (equivalent to 16 neighboring frames at 15 FPS).
+The video frames were zero-padded to 64x64 pixels. The behavior activities were added as separate channels.
+The entire tensor channel was filled with the value for each behavior measurement.
+No normalization is applied to the target and input tensors during training.
 
 The ensemble of models from all folds gets 0.2905 single-trial correlation on the main track and 0.2207 on the bonus track in the final phase of the competition.
 This result would be enough to take first place in the main and bonus (out-of-distribution) competition tracks.
@@ -205,7 +207,7 @@ Then, the beta value of Softplus was tuned, resulting in a score of 0.294.
 Lastly, adjusting drop rate and batch size parameters helped to achieve a score of 0.3 on the main track during the live phase.
 
 The ensemble of the basic and distillation training stages achieved a single-trial correlation of 0.2913 on the main track and 0.2215 on the bonus track in the final phase (0.3005 and 0.2173 in the live phase, respectively).
-This result is quite a bit better than the basic training result alone, but I should provide it because it was the best submission in the competition.
+This result is just a bit better than the basic training result alone, but I should provide it because it was the best submission in the competition.
 In addition, it was interesting to research the relation between ensembling and distillation, which I wrote above.
 
 Thanks to the Sensorium organizers and participants for the excellent competition. Thanks to my family and friends who supported me during the competition!
