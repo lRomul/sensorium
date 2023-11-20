@@ -1,9 +1,9 @@
-tqdm==4.65.0
-requests==2.30.0
-numpy==1.24.3
-pandas==2.0.1
-pyarrow==12.0.1
-torch>1
+tqdm==4.66.1
+requests==2.31.0
+numpy==1.26.1
+pandas==2.1.1
+pyarrow==14.0.1
+torch>=2.0.0
 pytorch-argus==1.0.0
-deeplake==3.6.22
+deeplake==3.8.6
 ImageHash==4.3.1
