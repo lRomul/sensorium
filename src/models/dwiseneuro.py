@@ -145,7 +145,7 @@ class InvertedResidual3d(nn.Module):
 
 
 class PositionalEncoding3d(nn.Module):
-    def __init__(self, channels):
+    def __init__(self, channels: int):
         super().__init__()
         self.orig_channels = channels
         channels = math.ceil(channels / 6) * 2
