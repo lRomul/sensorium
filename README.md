@@ -237,7 +237,7 @@ Thanks to the Sensorium organizers and participants for the excellent competitio
 
 * Linux (tested on Ubuntu 20.04 and 22.04)
 * NVIDIA GPU (models trained on RTX A6000)
-* NVIDIA Drivers >= 520, CUDA >= 11.8
+* NVIDIA Drivers >= 535, CUDA >= 12.2
 * [Docker](https://docs.docker.com/engine/install/)
 * [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
 
