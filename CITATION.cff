@@ -15,6 +15,6 @@ abstract: >-
   model architecture called DwiseNeuro and a training pipeline with a solid
   cross-validation strategy and knowledge distillation.
 license: MIT
-version: v23.11.18
-date-released: '2023-11-18'
+version: v23.11.22
+date-released: '2023-11-22'
 doi: 10.5281/zenodo.10155151
